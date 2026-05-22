@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Run Unit Tests
+        run: python -m pytest -q
+      - name: Compile Check
+        run: python -m compileall -q .
+
+  package-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build Clean Addon Package
+        run: python tools/package_addon.py --output /tmp/FreeCAD-CommandTab-package
+      - name: Verify Native Matrix (advisory)
+        run: python tools/verify_native_matrix.py --root /tmp/FreeCAD-CommandTab-package/freecad_commandtab/native/bin

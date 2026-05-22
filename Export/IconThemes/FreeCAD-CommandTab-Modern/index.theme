@@ -1,0 +1,11 @@
+[Icon Theme]
+Name=CommandTab Modern
+Comment=Modern icon theme exported from FreeCAD CommandTab
+Inherits=FreeCAD-default
+Directories=scalable
+
+[scalable]
+Size=64
+Type=Scalable
+MinSize=1
+MaxSize=256

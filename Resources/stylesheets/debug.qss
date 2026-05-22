@@ -1,0 +1,176 @@
+CommandTabApplicationButton, CommandTabPanelOptionButton {
+    border: 2px solid blue;
+    border-radius: 5px;
+}
+
+QToolBar {
+    border: 2px solid blue;
+    border-radius: 5px;
+}
+
+CommandTabApplicationButton::menu-indicator {
+    image: none;
+}
+
+CommandTabTabBar {
+    border: 2px solid purple;
+    border-radius: 20px;
+}
+
+CommandTabTitleLabel {
+    border: 2px solid purple;
+    border-radius: 20px;
+}
+
+CommandTabBar {
+    border: 2px solid red;
+    border-radius: 20px;
+}
+
+CommandTabCategory {
+    border: 2px solid green;
+    border-radius: 20px;
+}
+
+CommandTabCategoryScrollArea {
+    border: none;
+    background-color: transparent;
+}
+
+CommandTabCategoryScrollAreaContents {
+    border: none;
+    background-color: transparent;
+}
+
+CommandTabPanel {
+    border: 2px solid brown;
+    border-radius: 20px;
+
+}
+
+CommandTabSeparator {
+    border: 2px solid black;
+    border-radius: 20px;
+}
+
+CommandTabPanelTitle {
+    border: 2px solid green;
+    border-radius: 20px;
+}
+
+CommandTabPanelItemWidget {
+    border: 0px solid black;
+    border-radius: 20px;
+
+}
+
+QTabBar {
+  margin: 0px;
+  padding-bottom: 0px;
+  padding-top: 0px;}
+  QTabBar::tab {
+  	background: transparent;
+	margin-top: 4px;
+	margin-bottom: 4px;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	spacing: 0px;}
+  QTabBar::scroller {
+    min-width: 40px;}
+
+QDockWidget {
+	margin: 0px;
+	padding-bottom: 0px;
+	padding-top: 0px;}
+	QDockWidget::title {
+		margin: 0px;
+		padding: 0px;
+		text-align: center; }
+
+QDockWidget::title QToolButton, QDockWidget::title QWidget#Selector > QToolButton {
+	margin: 1px; }
+
+CommandTabApplicationButton::menu-indicator {
+    image: none;
+	border: none;
+}
+
+QTabBar, QDockWidget QTabBar {
+  qproperty-drawBase: 0;
+}
+
+CommandTabBar {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+CommandTabCategory {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 3px;
+	margin-left: 3px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+CommandTabCategoryScrollArea {
+    background-color: transparent;
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+CommandTabCategoryScrollAreaContents {
+    background-color: transparent;
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+CommandTabPanel {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+CommandTabPanelTitle {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+CommandTabPanelItemWidget {
+    padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+QTabBar {
+    background-color: transparent;
+}

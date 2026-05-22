@@ -1,0 +1,86 @@
+name: Native Matrix Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        qt_major: [5, 6]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt_major == 5 && '5.15.2' || '6.6.3' }}
+          cache: true
+
+      - name: Configure
+        run: >
+          cmake -S freecad_commandtab/native/cpp -B build/native
+          -DFREECAD_COMMANDTAB_QT_MAJOR_VERSION=${{ matrix.qt_major }}
+          -DFREECAD_COMMANDTAB_NATIVE_OUTPUT_DIR=${{ github.workspace }}/artifacts/native/${{ runner.os == 'Linux' && 'linux' || runner.os == 'Windows' && 'windows' || 'macos' }}/qt${{ matrix.qt_major }}
+
+      - name: Build
+        run: cmake --build build/native --config Release --parallel
+
+      - name: Upload Native Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ runner.os == 'Linux' && 'linux' || runner.os == 'Windows' && 'windows' || 'macos' }}-qt${{ matrix.qt_major }}
+          path: artifacts/native/${{ runner.os == 'Linux' && 'linux' || runner.os == 'Windows' && 'windows' || 'macos' }}/qt${{ matrix.qt_major }}
+          if-no-files-found: error
+
+  assemble-addon:
+    name: Assemble Multi-OS Addon
+    runs-on: ubuntu-latest
+    needs: build-native
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Native Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: _native_artifacts
+
+      - name: Merge Native Matrix Into Addon Tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf freecad_commandtab/native/bin
+          mkdir -p freecad_commandtab/native/bin
+          find _native_artifacts -type f \( -name '*.so' -o -name '*.dll' -o -name '*.dylib' \) | while read -r lib; do
+            rel="${lib#_native_artifacts/}"
+            artifact_name="${rel%%/*}"
+            platform_qt="${artifact_name#native-}"
+            platform="${platform_qt%-qt*}"
+            qt="qt${platform_qt##*-qt}"
+            target_dir="freecad_commandtab/native/bin/${platform}/${qt}"
+            mkdir -p "$target_dir"
+            cp "$lib" "$target_dir/"
+          done
+          find freecad_commandtab/native/bin -maxdepth 4 -type f | sort
+
+      - name: Verify Full Native Matrix
+        run: python tools/verify_native_matrix.py --root freecad_commandtab/native/bin --require-full-matrix
+
+      - name: Build Addon Package Folder
+        run: python tools/package_addon.py --output dist/FreeCAD-CommandTab
+
+      - name: Verify Packaged Matrix
+        run: python tools/verify_native_matrix.py --root dist/FreeCAD-CommandTab/freecad_commandtab/native/bin --require-full-matrix
+
+      - name: Upload Multi-OS Addon Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeCAD-CommandTab-multi-os
+          path: dist/FreeCAD-CommandTab
+          if-no-files-found: error

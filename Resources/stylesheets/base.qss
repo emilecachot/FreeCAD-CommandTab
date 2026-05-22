@@ -1,0 +1,65 @@
+
+CommandTabApplicationButton::menu-indicator {
+    image: none;
+}
+
+CommandTabCategory, CommandTabCategoryScrollArea, CommandTabCategoryScrollAreaContents {
+    border: none;
+    background-color: transparent;
+}
+
+CommandTabTabBar::tab {
+	padding-left: 10px;
+	padding-right: 10px;
+    iconSize: 24px 24px
+}
+
+CommandTabTabBar::tab:selected {
+	border-bottom: 3px solid blue;
+}
+
+CommandTabTabBar::tab:!selected {
+	border-bottom: none;
+}
+
+CommandTabTabBar::tab:hover:!selected {
+    padding-left: 10px;
+	border-bottom: 3px solid gray;
+}
+
+CommandTabPopupWidget {
+    border: 1px solid gray;
+    border-radius: 5px;
+    background-color: palette(window);
+    color: palette(windowText);
+}
+
+QMenu {
+    border: none;
+    border-radius: 5px;
+    background-color: palette(window);
+    color: palette(windowText);
+}
+
+QMenu::item {
+    color: palette(windowText);
+}
+
+QMenu:selected, QMenu::item:selected {
+    background-color: palette(highlight);
+    color: palette(highlightedText);
+}
+
+CommandTabGallery {
+    border: 1px solid gray;
+    border-radius: 5px;
+}
+
+CommandTabGalleryButton {
+    border: 1px solid gray;
+    border-radius: 5px;
+}
+
+CommandTabGalleryListWidget {
+    border: none;
+}

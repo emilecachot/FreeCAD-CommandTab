@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="/theme">
+    <file alias="dark/logo">../../../../Resources/icons/FreecadNew.svg</file>
+    <file alias="light/logo">../../../../Resources/icons/FreecadNew.svg</file>
+    <file alias="dark/more_arrow">../../../../Resources/stylesheets/theme/OpenDark/images_dark-light/light_more_arrow.svg</file>
+    <file alias="light/more_arrow">../../../../Resources/stylesheets/theme/OpenLight/images_dark-light/dark_more_arrow.svg</file>
+    <file alias="dark/down_arrow">../../../../Resources/stylesheets/theme/OpenDark/images_dark-light/light_down_arrow.svg</file>
+    <file alias="light/down_arrow">../../../../Resources/stylesheets/theme/OpenLight/images_dark-light/dark_down_arrow.svg</file>
+    <file alias="dark/expand">../../../../Resources/stylesheets/theme/OpenDark/images_dark-light/light_expand.svg</file>
+    <file alias="light/expand">../../../../Resources/stylesheets/theme/OpenLight/images_dark-light/dark_expand.svg</file>
+  </qresource>
+</RCC>
