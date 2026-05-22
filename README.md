@@ -9,12 +9,6 @@ FreeCAD CommandTab is a native-first ribbon UI addon for FreeCAD.
 Current project status and macOS handover notes are tracked in
 [`PROJECT_STATUS.md`](./PROJECT_STATUS.md).
 
-![Screenshot_light](./Resources/Images/Screenshot.png)
-![Closeup_Light](./Resources/Images/Screenshot_CloseUP.png)
-
-![Screenshot_Dark](./Resources/Images/Screenshot_DarkMode.png)
-![Closeup_Dark](./Resources/Images/Screenshot_DarkMode_CloseUP.png)
-
 ## Runtime Model
 
 Native mode is the only supported UI runtime.
@@ -49,7 +43,10 @@ Use the cross-platform helper to build and package the native backend for the cu
 python tools/build_and_package_local.py --qt-major 6
 ```
 
-On Windows, use the PowerShell wrapper for a simpler experience:
+On Windows, build with the same MSVC/Qt family used by FreeCAD. Mixing a
+MinGW-built DLL with a FreeCAD MSVC Qt runtime can produce missing-entry-point
+errors when the addon starts. The PowerShell wrapper is the simplest entry
+point when the local Qt/CMake paths are already configured:
 
 ```powershell
 ./tools/build_and_package_local.ps1 --native-platform windows --qt-major 6
@@ -85,10 +82,10 @@ python3 -m compileall -q .
 python3 tools/verify_native_matrix.py
 ```
 
-To verify only the currently targeted Linux+macOS Qt6 deliverables:
+To verify the currently shipped Linux, macOS and Windows Qt6 deliverables:
 
 ```bash
-python3 tools/verify_native_matrix.py --platform linux --platform macos --qt qt6
+python3 tools/verify_native_matrix.py --platform linux --platform macos --platform windows --qt qt6
 ```
 
 ### 4. Build a distributable addon folder
@@ -140,6 +137,8 @@ Copy `dist/FreeCAD-CommandTab` to your FreeCAD `Mod` directory and restart FreeC
 
 ### Install via Addon Manager
 
+Once this repository has been accepted into the FreeCAD Addon Index:
+
 1. Open FreeCAD Addon Manager.
 1. Search `FreeCAD-CommandTab`.
 1. Click `Install` and restart FreeCAD.
@@ -150,7 +149,7 @@ Before publishing a fork for Addon Manager review:
 
 1. Push this repository to a public GitHub repository.
 1. Add the repository topics `freecad` and `addon`.
-1. Update `package.xml` so the repository and readme URLs point to the public fork.
+1. Verify `package.xml` points to `https://github.com/emilecachot/FreeCAD-CommandTab`.
 1. Keep the prebuilt native runtime files in `freecad_commandtab/native/bin/<platform>/qt<major>/`.
 1. Do not commit `build/`, `dist/`, local Qt SDKs, debug symbols, import libraries, or old MinGW runtime DLLs.
 1. Follow [`docs/ADDON_MANAGER_SUBMISSION.md`](./docs/ADDON_MANAGER_SUBMISSION.md) when creating the FreeCAD Addon Index request.
