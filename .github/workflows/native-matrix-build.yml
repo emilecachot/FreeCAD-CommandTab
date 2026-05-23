@@ -97,8 +97,17 @@ jobs:
 
             foreach ($candidate in $rccCandidates) {
               if ($candidate -and (Test-Path $candidate)) {
-                Write-Host "Using Linux system rcc: $candidate"
-                $configureArgs += "-DFREECAD_COMMANDTAB_QT_RCC_EXECUTABLE=$candidate"
+                $rccWrapper = Join-Path $env:RUNNER_TEMP "commandtab-rcc"
+                $wrapperLines = @(
+                  "#!/usr/bin/env bash",
+                  "unset LD_LIBRARY_PATH",
+                  "exec '$candidate' " + '"$@"'
+                )
+                Set-Content -Path $rccWrapper -Value $wrapperLines
+                chmod +x $rccWrapper
+
+                Write-Host "Using Linux system rcc wrapper: $rccWrapper -> $candidate"
+                $configureArgs += "-DFREECAD_COMMANDTAB_QT_RCC_EXECUTABLE=$rccWrapper"
                 break
               }
             }
