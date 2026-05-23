@@ -100,8 +100,18 @@ jobs:
                 $rccWrapper = Join-Path $env:RUNNER_TEMP "commandtab-rcc"
                 $wrapperLines = @(
                   "#!/usr/bin/env bash",
+                  "set -e",
+                  "args=()",
+                  'while [ "$#" -gt 0 ]; do',
+                  '  if [ "$1" = "-name" ]; then',
+                  '    args+=("--name")',
+                  "  else",
+                  '    args+=("$1")',
+                  "  fi",
+                  "  shift",
+                  "done",
                   "unset LD_LIBRARY_PATH",
-                  "exec '$candidate' " + '"$@"'
+                  "exec '$candidate' " + '"${args[@]}"'
                 )
                 Set-Content -Path $rccWrapper -Value $wrapperLines
                 chmod +x $rccWrapper
