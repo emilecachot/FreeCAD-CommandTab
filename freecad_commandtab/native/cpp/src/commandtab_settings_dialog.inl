@@ -2774,20 +2774,81 @@ QStringList commandIconCandidates(const QString& commandId)
         return candidates;
     }
 
-    candidates.push_back(normalized);
-    if (normalized.endsWith(QStringLiteral("_ddb"))) {
-        candidates.push_back(normalized.left(normalized.size() - 4));
+    auto appendUnique = [&candidates](const QString& value) {
+        const QString trimmed = value.trimmed();
+        if (!trimmed.isEmpty() && !candidates.contains(trimmed)) {
+            candidates.push_back(trimmed);
+        }
+    };
+    auto appendRichVariants = [&appendUnique](const QString& value) {
+        const QString token = value.trimmed();
+        if (token.isEmpty()) {
+            return;
+        }
+        appendUnique(token);
+
+        QString compact = token;
+        compact.replace(QLatin1Char('\\'), QLatin1Char('/'));
+        compact = compact.simplified();
+        appendUnique(compact);
+
+        QString withUnderscores = compact;
+        withUnderscores.replace(QLatin1Char(' '), QLatin1Char('_'));
+        appendUnique(withUnderscores);
+
+        QString withDashes = withUnderscores;
+        withDashes.replace(QLatin1Char('_'), QLatin1Char('-'));
+        appendUnique(withDashes);
+
+        appendUnique(compact.toLower());
+        appendUnique(withUnderscores.toLower());
+        appendUnique(withDashes.toLower());
+
+        const QString baseName = QFileInfo(token).completeBaseName();
+        if (!baseName.isEmpty() && baseName != token) {
+            appendUnique(baseName);
+            appendUnique(baseName.toLower());
+        }
+    };
+
+    appendRichVariants(normalized);
+    if (normalized.endsWith(QStringLiteral("_ddb")) && normalized.size() > 4) {
+        appendRichVariants(normalized.left(normalized.size() - 4));
     }
 
     const qsizetype parentSeparatorIndex = normalized.indexOf(QStringLiteral(", "));
     if (parentSeparatorIndex > 0) {
         const QString parentCommand = normalized.left(parentSeparatorIndex).trimmed();
         if (!parentCommand.isEmpty()) {
-            candidates.push_back(parentCommand);
-            if (parentCommand.endsWith(QStringLiteral("_ddb"))) {
-                candidates.push_back(parentCommand.left(parentCommand.size() - 4));
+            appendRichVariants(parentCommand);
+            if (parentCommand.endsWith(QStringLiteral("_ddb")) && parentCommand.size() > 4) {
+                appendRichVariants(parentCommand.left(parentCommand.size() - 4));
             }
         }
+    }
+
+    const QString normalizedLower = normalized.toLower();
+    if (
+        normalizedLower == QStringLiteral("createbom_overall")
+        || normalizedLower == QStringLiteral("assembly_createbom")
+    ) {
+        appendRichVariants(QStringLiteral("Assembly_BillOfMaterials.svg"));
+        appendRichVariants(QStringLiteral("Assembly_CreateBom"));
+        appendRichVariants(QStringLiteral("CreateBOM_Overall"));
+    }
+    if (
+        normalizedLower == QStringLiteral("__commandtab_toggle_grid__")
+        || normalizedLower == QStringLiteral("draft_togglegrid")
+        || normalizedLower == QStringLiteral("sketcher_grid")
+    ) {
+        appendRichVariants(QStringLiteral("Sketcher_GridToggle_Deactivated.svg"));
+        appendRichVariants(QStringLiteral("Draft_ToggleGrid"));
+        appendRichVariants(QStringLiteral("Sketcher_Grid"));
+        appendRichVariants(QStringLiteral("view-grid"));
+    }
+    if (normalizedLower == QStringLiteral("edit tools")) {
+        appendRichVariants(QStringLiteral("Sketcher_EditSketch"));
+        appendRichVariants(QStringLiteral("modern_cmd_sketch_edit.svg"));
     }
 
     QStringList orderedCandidates;

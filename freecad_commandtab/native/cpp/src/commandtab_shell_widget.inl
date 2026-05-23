@@ -2027,6 +2027,24 @@ QToolButton[commandtabRole="quick"] {
     border-radius: 9px;
     padding: 1px;
 }
+QToolButton[commandtabRole="quick"][commandtabHasMenuCommands="true"] {
+    padding-right: 13px;
+}
+QToolButton[commandtabRole="quick"][commandtabHasMenuCommands="true"]::menu-button {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    width: 12px;
+    border: none;
+    border-left: 1px solid %11;
+    margin: 2px 2px 2px 0px;
+    border-top-right-radius: 7px;
+    border-bottom-right-radius: 7px;
+    background: %10;
+}
+QToolButton[commandtabRole="quick"][commandtabHasMenuCommands="true"]::menu-arrow {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+}
 QToolButton[commandtabRole="quick"]:hover {
     background: %10;
     border: 1px solid %13;
@@ -3986,6 +4004,7 @@ QWidget#CommandTabWorkbenchViewport {
                 }
                 button->setPopupMode(QToolButton::MenuButtonPopup);
                 button->setMenu(menu);
+                button->setFixedWidth(button->width() + scaledHeaderPx(12));
             }
             connect(button, &QToolButton::clicked, this, [this, panelKey, command]() {
                 dispatchCommand(command.id, panelKey);
