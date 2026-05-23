@@ -101,17 +101,11 @@ jobs:
                 $wrapperLines = @(
                   "#!/usr/bin/env bash",
                   "set -e",
-                  "args=()",
-                  'while [ "$#" -gt 0 ]; do',
-                  '  if [ "$1" = "-name" ]; then',
-                  '    args+=("--name")',
-                  "  else",
-                  '    args+=("$1")',
+                  'if [ "${1:-}" = "-name" ]; then',
+                  "  shift 2",
                   "  fi",
-                  "  shift",
-                  "done",
                   "unset LD_LIBRARY_PATH",
-                  "exec '$candidate' " + '"${args[@]}"'
+                  "exec '$candidate' " + '"$@"'
                 )
                 Set-Content -Path $rccWrapper -Value $wrapperLines
                 chmod +x $rccWrapper
