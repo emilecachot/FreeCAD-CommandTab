@@ -147,7 +147,10 @@ def test_native_dropdown_commands_use_split_button_behavior() -> None:
     ).read_text(encoding="utf-8")
 
     assert "include_plain_command_actions = len(actions) > 1" in bridge_text
+    assert "from PySide.QtWidgets import QToolBar, QToolButton, QWidget" in bridge_text
+    assert "toolbar.findChildren(QToolButton)" in bridge_text
     assert "dropdownHotZoneRect().contains(event->pos())" in widget_text
+    assert "return scaledPx(15)" in widget_text
     assert "shouldShowMenu" in widget_text
     assert "QToolButton::MenuButtonPopup" in shell_text
 

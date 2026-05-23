@@ -21,7 +21,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 from PySide.QtCore import QByteArray, QFileInfo, QLocale, QSize, Qt, QTimer, qVersion
 from PySide.QtGui import QApplication, QColor, QIcon, QPainter, QPixmap
-from PySide.QtWidgets import QToolBar, QWidget
+from PySide.QtWidgets import QToolBar, QToolButton, QWidget
 
 import Parameters_CommandTab
 from freecad_commandtab import paths
@@ -2945,6 +2945,41 @@ def _toolbar_menu_actions_for_command(parent_command_name: str) -> list:
             menu_actions = _action_menu_actions(action_widget)
             if len(menu_actions) > 0:
                 return menu_actions
+
+        try:
+            tool_buttons = list(toolbar.findChildren(QToolButton))
+        except Exception:
+            tool_buttons = []
+        for tool_button in tool_buttons:
+            action_candidates = []
+            try:
+                default_action = tool_button.defaultAction()
+            except Exception:
+                default_action = None
+            if default_action is not None:
+                action_candidates.append(default_action)
+            try:
+                action_candidates.extend(list(tool_button.actions()))
+            except Exception:
+                pass
+
+            matched_button = _action_command_id(tool_button) == parent_command_name
+            if not matched_button:
+                for action_candidate in action_candidates:
+                    if _action_command_id(action_candidate) == parent_command_name:
+                        matched_button = True
+                        break
+            if not matched_button:
+                continue
+
+            menu_actions = _action_menu_actions(tool_button)
+            if len(menu_actions) > 0:
+                return menu_actions
+
+            for action_candidate in action_candidates:
+                menu_actions = _action_menu_actions(action_candidate)
+                if len(menu_actions) > 0:
+                    return menu_actions
     return []
 
 

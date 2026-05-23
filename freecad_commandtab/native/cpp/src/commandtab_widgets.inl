@@ -511,9 +511,9 @@ private:
             return 0;
         }
         if (!m_textVisible) {
-            return scaledPx(11);
+            return scaledPx(15);
         }
-        return scaledPx(18);
+        return scaledPx(20);
     }
 
     int dropdownReservedWidth() const
@@ -910,10 +910,10 @@ private:
             paintDropdownIndicator(
                 painter,
                 QRect(
-                    dropdownHotZoneRect().center().x() - scaledPx(4),
-                    contentRect.top() + scaledPx(6),
-                    scaledPx(8),
-                    scaledPx(8)
+                    dropdownHotZoneRect().center().x() - scaledPx(5),
+                    contentRect.top() + scaledPx(5),
+                    scaledPx(10),
+                    scaledPx(9)
                 )
             );
         }
@@ -1016,16 +1016,16 @@ private:
         if (hasMenuCommands()) {
             const QRect dropdownRect = m_textVisible
                 ? QRect(
-                    dropdownHotZoneRect().center().x() - scaledPx(4),
+                    dropdownHotZoneRect().center().x() - scaledPx(5),
                     contentRect.top() + scaledPx(4),
-                    scaledPx(8),
-                    scaledPx(8)
+                    scaledPx(10),
+                    scaledPx(9)
                 )
                 : QRect(
-                    dropdownHotZoneRect().center().x() - scaledPx(2),
-                    contentRect.top() + scaledPx(1),
-                    scaledPx(4),
-                    scaledPx(4)
+                    dropdownHotZoneRect().center().x() - scaledPx(4),
+                    contentRect.bottom() - scaledPx(8),
+                    scaledPx(8),
+                    scaledPx(7)
                 );
             paintDropdownIndicator(painter, dropdownRect);
         }
@@ -1056,7 +1056,6 @@ private:
     {
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing, true);
-        painter->setPen(Qt::NoPen);
         QColor textBackground = baseTextBackgroundColor();
         if (m_pressed || m_hovered || hasFocus()) {
             const QColor fill = withAlpha(
@@ -1065,15 +1064,17 @@ private:
             );
             textBackground = blendColors(textBackground, fill, m_pressed ? 0.44 : 0.28);
         }
-        painter->setBrush(
-            isEnabled()
-                ? readableButtonTextColor(textBackground)
-                : disabledButtonTextColor(textBackground)
-        );
+        const QColor arrowColor = isEnabled()
+            ? readableButtonTextColor(textBackground)
+            : disabledButtonTextColor(textBackground);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(withAlpha(m_theme->shellBackground, m_theme->isDark ? 120 : 70));
+        painter->drawRoundedRect(rect.adjusted(-scaledPx(2), -scaledPx(1), scaledPx(2), scaledPx(1)), scaledPx(3), scaledPx(3));
+        painter->setBrush(arrowColor);
         QPolygon triangle;
-        triangle << QPoint(rect.left(), rect.top() + scaledPx(2))
-                 << QPoint(rect.right(), rect.top() + scaledPx(2))
-                 << QPoint(rect.center().x(), rect.bottom());
+        triangle << QPoint(rect.left(), rect.top() + scaledPx(1))
+                 << QPoint(rect.right(), rect.top() + scaledPx(1))
+                 << QPoint(rect.center().x(), rect.bottom() - scaledPx(1));
         painter->drawPolygon(triangle);
         painter->restore();
     }
@@ -1091,6 +1092,22 @@ private:
 
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing, true);
+        const QColor stripFill = withAlpha(
+            blendColors(
+                m_theme->buttonActiveTop,
+                m_theme->panelBodyBottom,
+                m_dropdownPressed ? 0.18 : 0.34
+            ),
+            (m_dropdownHovered || m_dropdownPressed) ? (m_dropdownPressed ? 112 : 78) : 34
+        );
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(stripFill);
+        painter->drawRoundedRect(
+            zoneRect.adjusted(0, scaledPx(1), -scaledPx(1), -scaledPx(1)),
+            scaledPx(4),
+            scaledPx(4)
+        );
+
         if (m_dropdownHovered || m_dropdownPressed) {
             const QColor fill = withAlpha(
                 blendColors(
@@ -1109,19 +1126,17 @@ private:
             );
         }
 
-        if (m_textVisible) {
-            const QColor separatorColor = withAlpha(
-                m_theme->buttonActiveBorder,
-                (m_dropdownHovered || m_dropdownPressed) ? 132 : 78
-            );
-            painter->setPen(QPen(separatorColor, std::max<qreal>(1.0, displayScaleFactor())));
-            painter->drawLine(
-                zoneRect.left(),
-                zoneRect.top() + scaledPx(7),
-                zoneRect.left(),
-                zoneRect.bottom() - scaledPx(7)
-            );
-        }
+        const QColor separatorColor = withAlpha(
+            m_theme->buttonActiveBorder,
+            (m_dropdownHovered || m_dropdownPressed) ? 150 : 96
+        );
+        painter->setPen(QPen(separatorColor, std::max<qreal>(1.0, displayScaleFactor())));
+        painter->drawLine(
+            zoneRect.left(),
+            zoneRect.top() + (m_textVisible ? scaledPx(7) : scaledPx(5)),
+            zoneRect.left(),
+            zoneRect.bottom() - (m_textVisible ? scaledPx(7) : scaledPx(5))
+        );
         painter->restore();
     }
 
