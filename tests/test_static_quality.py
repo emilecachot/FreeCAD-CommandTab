@@ -135,6 +135,23 @@ def test_windows_native_loader_registers_dll_directory() -> None:
     assert "_WINDOWS_DLL_SEARCH_PATH_HANDLES.append(handle)" in bridge_text
 
 
+def test_native_dropdown_commands_use_split_button_behavior() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    widget_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_widgets.inl"
+    ).read_text(encoding="utf-8")
+    shell_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl"
+    ).read_text(encoding="utf-8")
+
+    assert "include_plain_command_actions = len(actions) > 1" in bridge_text
+    assert "dropdownHotZoneRect().contains(event->pos())" in widget_text
+    assert "shouldShowMenu" in widget_text
+    assert "QToolButton::MenuButtonPopup" in shell_text
+
+
 def test_build_script_uses_release_config_by_default() -> None:
     build_script_text = (ROOT / "tools" / "build_and_package_local.py").read_text(
         encoding="utf-8"

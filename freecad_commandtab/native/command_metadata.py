@@ -18,6 +18,12 @@ _ICON_RELATIVE_PATH_INDEX: dict[str, str] = {}
 _ICON_STEM_INDEX: dict[str, str] = {}
 
 
+def _allow_gui_icon_warning_fallback() -> bool:
+    return str(
+        os.environ.get("FREECAD_COMMANDTAB_ENABLE_GUI_ICON_FALLBACK", "")
+    ).strip().lower() in ["1", "true", "yes", "on"]
+
+
 def _standard_functions_module():
     try:
         import Standard_Functions_CommandTab as StandardFunctions
@@ -234,6 +240,42 @@ def _command_object(command_name: str):
 def _gui_icon(icon_name: str) -> QIcon:
     icon_name = normalize_command_name(icon_name)
     if icon_name == "":
+        return QIcon()
+
+    if icon_name.startswith(":/"):
+        file_info = QFileInfo(icon_name)
+        if file_info.exists():
+            icon = QIcon(icon_name)
+            if icon.isNull() is False:
+                return icon
+        return QIcon()
+
+    if icon_name.startswith("icons:"):
+        file_info = QFileInfo(icon_name)
+        if file_info.exists():
+            icon = QIcon(icon_name)
+            if icon.isNull() is False:
+                return icon
+        resolved_path = _resolve_icon_from_search_paths(icon_name[len("icons:") :])
+        if resolved_path != "":
+            icon = QIcon(resolved_path)
+            if icon.isNull() is False:
+                return icon
+        return QIcon()
+
+    if os.path.exists(icon_name):
+        icon = QIcon(os.path.abspath(icon_name))
+        if icon.isNull() is False:
+            return icon
+        return QIcon()
+
+    resolved_path = _resolve_icon_from_search_paths(icon_name)
+    if resolved_path != "":
+        icon = QIcon(resolved_path)
+        if icon.isNull() is False:
+            return icon
+
+    if _allow_gui_icon_warning_fallback() is False:
         return QIcon()
 
     try:

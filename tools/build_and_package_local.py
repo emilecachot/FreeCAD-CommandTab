@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_QT_MAJOR = os.environ.get("QT_MAJOR", "6")
-DEFAULT_PACKAGE_DIR = ROOT / "dist" / "FreeCAD-CommandTab"
+DEFAULT_PACKAGE_DIR = ROOT / "dist" / "CommandTab"
 DEFAULT_CMAKE_EXECUTABLE = os.environ.get("CMAKE", "cmake")
 DEFAULT_BUILD_CONFIG = "Release"
 

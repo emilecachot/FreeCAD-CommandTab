@@ -91,35 +91,36 @@ python3 tools/verify_native_matrix.py --platform linux --platform macos --platfo
 ### 4. Build a distributable addon folder
 
 ```bash
-python3 tools/package_addon.py --output dist/FreeCAD-CommandTab
+python3 tools/package_addon.py --output dist/CommandTab
 ```
 
 This packaging step now also creates the `FREECAD_COMMANDTAB_NATIVE` marker file in the addon root so native mode is enabled automatically when the addon is installed.
 
-Optional release check (Linux/Windows/macOS, Qt5+Qt6):
+Optional Qt6 release check (Linux/Windows/macOS):
 
 ```bash
-python3 tools/verify_native_matrix.py --root dist/FreeCAD-CommandTab/freecad_commandtab/native/bin --require-full-matrix
+python3 tools/verify_native_matrix.py --root dist/CommandTab/freecad_commandtab/native/bin --platform linux --platform macos --platform windows --qt qt6 --require-full-matrix
 ```
 
 ### 4b. Build a single multi-OS addon via GitHub Actions
 
-Run workflow `.github/workflows/native-matrix-build.yml` (`workflow_dispatch`).
+Run workflow `.github/workflows/native-matrix-build.yml` (`workflow_dispatch`), or push a `v*` tag.
 
 It will:
 
-- build native backends for `linux/windows/macos` and `qt5/qt6`
+- build Qt6 native backends for `linux` x64, `windows` x64 and `macos` Apple Silicon
 - assemble them into one addon tree under `freecad_commandtab/native/bin/<platform>/qt<major>/`
-- verify full matrix completeness
-- upload artifact `FreeCAD-CommandTab-multi-os`
+- verify the Qt6 matrix completeness
+- upload both `FreeCAD-CommandTab-multi-os-qt6` and `FreeCAD-CommandTab-multi-os-qt6.zip`
 
 ### 5. Install locally for FreeCAD
 
-Copy `dist/FreeCAD-CommandTab` to your FreeCAD `Mod` directory and restart FreeCAD.
+Copy `dist/CommandTab` to your FreeCAD `Mod` directory and restart FreeCAD.
 
 ## Project Structure
 
 - `InitGui.py`: FreeCAD entrypoint and startup orchestration
+- `freecad/CommandTab/init_gui.py`: FreeCAD 1.1 namespace entrypoint
 - `freecad_commandtab/native/bootstrap.py`: startup policy, native attach, runtime diagnostics
 - `freecad_commandtab/native/bridge.py`: Python/C++ bridge (ctypes), metadata, refresh flows
 - `freecad_commandtab/native/cpp`: native UI/runtime sources

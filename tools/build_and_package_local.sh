@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 BUILD_DIR="${BUILD_DIR:-}"
 QT_MAJOR="${QT_MAJOR:-6}"
-PACKAGE_DIR="${PACKAGE_DIR:-dist/FreeCAD-CommandTab}"
+PACKAGE_DIR="${PACKAGE_DIR:-dist/CommandTab}"
 
 detect_native_platform() {
   case "$(uname -s)" in

@@ -21,7 +21,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 from PySide.QtCore import QByteArray, QFileInfo, QLocale, QSize, Qt, QTimer, qVersion
 from PySide.QtGui import QApplication, QColor, QIcon, QPainter, QPixmap
-from PySide.QtWidgets import QWidget
+from PySide.QtWidgets import QToolBar, QWidget
 
 import Parameters_CommandTab
 from freecad_commandtab import paths
@@ -60,7 +60,7 @@ _NATIVE_RUNTIME_LAST_STAGE = "idle"
 _WINDOWS_DLL_SEARCH_PATH_HANDLES: list[object] = []
 _STRUCTURE_CACHE: dict[str, object] = {}
 _COMMAND_INFO_CACHE: dict[str, dict] = {}
-_COMMAND_ENTRY_CACHE: dict[tuple[str, str, str, str, str], dict] = {}
+_COMMAND_ENTRY_CACHE: dict[tuple[object, ...], dict] = {}
 _QT_ACTION_CACHE: dict[tuple[str, str], dict[str, dict]] = {}
 _QT_ACTION_CACHE_FAILURES: dict[tuple[str, str], int] = {}
 _WORKBENCH_TITLE_CACHE: dict[str, str] = {}
@@ -124,7 +124,7 @@ _NATIVE_METADATA_SCOPE_ALL_WORKBENCH_ICONS = str(
 _NATIVE_PERSISTENT_METADATA_BOOTSTRAP_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PERSISTENT_METADATA_BOOTSTRAP", "0") or "0"
 ).strip().lower() in {"1", "true", "yes", "on"}
-_NATIVE_METADATA_CACHE_VERSION = 33
+_NATIVE_METADATA_CACHE_VERSION = 35
 _AVAILABLE_WORKBENCHES_CACHE_TTL_S = 0.45
 _MAIN_WINDOW_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/MainWindow")
 _COMMANDTAB_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab")
@@ -2381,9 +2381,12 @@ def _workbench_icon_path(workbench_name: str, persistent: bool = False) -> str:
         return candidates
 
     def _resolve_icon(tokens: list[str]) -> QIcon:
+        allow_gui_icon_fallback = str(
+            os.environ.get("FREECAD_COMMANDTAB_ENABLE_GUI_ICON_FALLBACK", "")
+        ).strip().lower() in ["1", "true", "yes", "on"]
         for token in tokens:
             icon = QIcon(token)
-            if icon.isNull():
+            if icon.isNull() and allow_gui_icon_fallback:
                 try:
                     icon = Gui.getIcon(token)
                 except Exception:
@@ -2636,6 +2639,20 @@ def _runtime_icon_path(command_name: str, icon_hint: str = "", theme_signature: 
     return _runtime_icons_dir() / f"{safe_name}_{digest[:12]}.png"
 
 
+def _runtime_action_icon_path(action_ref: str, icon_cache_key: str = "") -> Path:
+    theme_signature = "|".join(_native_theme_signature())
+    digest = hashlib.sha1(
+        (
+            f"{action_ref}|{icon_cache_key}|{theme_signature}"
+            f"|metadata-v{_NATIVE_METADATA_CACHE_VERSION}|native-action-icon-export-v1"
+        ).encode()
+    ).hexdigest()
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(action_ref or "action")).strip("_")
+    if safe_name == "":
+        safe_name = "action"
+    return _runtime_icons_dir() / f"{safe_name[:96]}_{digest[:12]}.png"
+
+
 def _persistent_icon_path(
     command_name: str, icon_hint: str = "", theme_signature: str = ""
 ) -> Path:
@@ -2711,6 +2728,453 @@ def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = Fals
         return qt_icon_path
 
     return ""
+
+
+def _normalize_action_candidate(value) -> str:
+    if value in [None, ""]:
+        return ""
+    try:
+        normalized = str(value).strip()
+    except Exception:
+        return ""
+    if "\t" in normalized:
+        normalized = normalized.split("\t", 1)[0].strip()
+    return normalized
+
+
+def _looks_like_command_id(value: str) -> bool:
+    normalized = _normalize_action_candidate(value)
+    if normalized == "":
+        return False
+    if "," in normalized:
+        left, _, right = normalized.partition(",")
+        if left.strip() != "" and right.strip().isdigit() and not any(
+            character.isspace() for character in left
+        ):
+            return True
+    return not any(character.isspace() for character in normalized)
+
+
+def _action_property_text(action, name: str) -> str:
+    try:
+        return _normalize_action_candidate(action.property(name))
+    except Exception:
+        return ""
+
+
+def _action_command_id(action) -> str:
+    if action is None:
+        return ""
+
+    candidates = []
+    for getter in [
+        lambda: action.objectName(),
+        lambda: _action_property_text(action, "Command"),
+        lambda: _action_property_text(action, "command"),
+        lambda: _action_property_text(action, "actionName"),
+        lambda: action.data(),
+    ]:
+        try:
+            candidates.append(_normalize_action_candidate(getter()))
+        except Exception:
+            pass
+
+    for candidate in candidates:
+        if _looks_like_command_id(candidate):
+            return candidate
+
+    associated_objects = []
+    for getter in [
+        lambda: action.associatedObjects(),
+        lambda: action.associatedWidgets(),
+    ]:
+        try:
+            associated_objects.extend(list(getter()))
+        except Exception:
+            pass
+    for widget in associated_objects:
+        for getter in [
+            lambda widget=widget: widget.objectName(),
+            lambda widget=widget: widget.property("Command"),
+            lambda widget=widget: widget.property("command"),
+        ]:
+            try:
+                candidate = _normalize_action_candidate(getter())
+            except Exception:
+                candidate = ""
+            if _looks_like_command_id(candidate):
+                return candidate
+    return ""
+
+
+def _clean_action_text(value) -> str:
+    text = _normalize_action_candidate(value)
+    if text == "":
+        return ""
+    return text.replace("&", "").strip()
+
+
+def _action_display_text(action, fallback_command_name: str = "") -> str:
+    if action is None:
+        return ""
+
+    for getter in [
+        lambda: action.iconText(),
+        lambda: action.text(),
+        lambda: action.toolTip(),
+        lambda: action.statusTip(),
+    ]:
+        try:
+            text = _clean_action_text(getter())
+        except Exception:
+            text = ""
+        if text == "":
+            continue
+        if _looks_like_technical_command_text(text, fallback_command_name) is False:
+            return text
+
+    try:
+        return _clean_action_text(action.text())
+    except Exception:
+        return ""
+
+
+def _action_shortcut_text(action) -> str:
+    if action is None:
+        return ""
+    try:
+        shortcut = action.shortcut()
+        text = shortcut.toString() if hasattr(shortcut, "toString") else str(shortcut)
+        return str(text or "").strip()
+    except Exception:
+        return ""
+
+
+def _action_menu_actions(action) -> list:
+    try:
+        menu = action.menu()
+    except Exception:
+        menu = None
+    if menu is None:
+        return []
+    try:
+        return list(menu.actions())
+    except Exception:
+        return []
+
+
+def _is_separator_action(action) -> bool:
+    try:
+        return bool(action.isSeparator())
+    except Exception:
+        return False
+
+
+def _encode_command_action_trigger(
+    parent_command_name: str,
+    path: list[int],
+    source: str = "commandActions",
+) -> str:
+    payload = json.dumps(
+        {
+            "command": str(parent_command_name or ""),
+            "path": [int(index) for index in path],
+            "source": str(source or "commandActions"),
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    encoded = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+    return f"__commandtab_action__:{encoded}"
+
+
+def _decode_command_action_trigger(encoded_payload: str) -> tuple[str, list[int], str]:
+    payload = str(encoded_payload or "").strip()
+    if payload == "":
+        return "", [], ""
+    padding = "=" * (-len(payload) % 4)
+    decoded = json.loads(base64.urlsafe_b64decode(f"{payload}{padding}").decode("utf-8"))
+    if not isinstance(decoded, dict):
+        return "", [], ""
+    command_name = str(decoded.get("command") or "").strip()
+    source = str(decoded.get("source") or "commandActions").strip()
+    path = []
+    for value in decoded.get("path", []):
+        try:
+            path.append(int(value))
+        except Exception:
+            return "", [], ""
+    return command_name, path, source
+
+
+def _toolbar_menu_actions_for_command(parent_command_name: str) -> list:
+    parent_command_name = str(parent_command_name or "").strip()
+    if parent_command_name == "":
+        return []
+    try:
+        main_window = Gui.getMainWindow()
+    except Exception:
+        main_window = None
+    if main_window is None:
+        return []
+
+    try:
+        toolbars = list(main_window.findChildren(QToolBar))
+    except Exception:
+        toolbars = []
+
+    for toolbar in toolbars:
+        try:
+            toolbar_actions = list(toolbar.actions())
+        except Exception:
+            toolbar_actions = []
+        for toolbar_action in toolbar_actions:
+            if _action_command_id(toolbar_action) != parent_command_name:
+                continue
+
+            menu_actions = _action_menu_actions(toolbar_action)
+            if len(menu_actions) > 0:
+                return menu_actions
+
+            try:
+                action_widget = toolbar.widgetForAction(toolbar_action)
+            except Exception:
+                action_widget = None
+            if action_widget is None:
+                continue
+            menu_actions = _action_menu_actions(action_widget)
+            if len(menu_actions) > 0:
+                return menu_actions
+    return []
+
+
+def _command_action_at_path(
+    parent_command_name: str,
+    path: list[int],
+    source: str = "commandActions",
+):
+    if parent_command_name == "" or len(path) == 0:
+        return None
+    if source == "toolbarMenu":
+        current_actions = _toolbar_menu_actions_for_command(parent_command_name)
+        action = None
+        for index in path:
+            if index < 0 or index >= len(current_actions):
+                return None
+            action = current_actions[index]
+            current_actions = _action_menu_actions(action)
+        return action
+
+    try:
+        command = Gui.Command.get(parent_command_name)
+        actions = list(command.getAction()) if command is not None else []
+    except Exception:
+        return None
+
+    action = None
+    current_actions = actions
+    for index in path:
+        if index < 0 or index >= len(current_actions):
+            return None
+        action = current_actions[index]
+        current_actions = _action_menu_actions(action)
+    return action
+
+
+def _trigger_encoded_command_action(encoded_payload: str) -> bool:
+    parent_command_name, path, source = _decode_command_action_trigger(encoded_payload)
+    action = _command_action_at_path(parent_command_name, path, source)
+    if action is None:
+        return False
+    try:
+        if bool(action.isEnabled()) is False:
+            return False
+    except Exception:
+        pass
+    try:
+        action.trigger()
+        return True
+    except Exception:
+        return False
+
+
+def _export_action_icon(action_ref: str, action) -> str:
+    if action is None:
+        return ""
+    try:
+        icon = action.icon()
+    except Exception:
+        icon = QIcon()
+    if icon is None or icon.isNull():
+        return ""
+
+    try:
+        icon_cache_key = str(int(icon.cacheKey()))
+    except Exception:
+        icon_cache_key = action_ref
+    output_path = _runtime_action_icon_path(action_ref, icon_cache_key)
+    if output_path.exists():
+        return str(output_path)
+
+    pixmap = icon.pixmap(QSize(64, 64))
+    if pixmap is None or pixmap.isNull():
+        pixmap = icon.pixmap(QSize(48, 48))
+    if pixmap is None or pixmap.isNull():
+        return ""
+
+    try:
+        if pixmap.save(str(output_path), "PNG"):
+            return str(output_path)
+    except Exception:
+        pass
+    return ""
+
+
+def _command_subaction_trigger_id(
+    parent_command_name: str,
+    action,
+    path: list[int],
+    source: str = "commandActions",
+) -> str:
+    action_command_id = _action_command_id(action)
+    if (
+        action_command_id != ""
+        and action_command_id != parent_command_name
+        and _has_gui_command(action_command_id)
+    ):
+        return action_command_id
+    return _encode_command_action_trigger(parent_command_name, path, source)
+
+
+def _build_command_subaction_entry(
+    parent_command_name: str,
+    action,
+    path: list[int],
+    command_data: dict,
+    source: str = "commandActions",
+) -> dict | None:
+    if action is None or _is_separator_action(action):
+        return None
+
+    menu_actions = _action_menu_actions(action)
+    if len(menu_actions) > 0:
+        return None
+
+    trigger_id = _command_subaction_trigger_id(parent_command_name, action, path, source)
+    text = _action_display_text(action, parent_command_name)
+    if text == "":
+        text = _humanized_command_id(trigger_id)
+
+    icon_path = _export_action_icon(trigger_id, action)
+    if icon_path == "" and not trigger_id.startswith("__commandtab_action__:"):
+        icon_path = _export_icon(trigger_id, "")
+
+    entry = {
+        "type": "command",
+        "id": trigger_id,
+        "text": text,
+        "size": "small",
+        "textVisible": True,
+        "iconPath": icon_path,
+        "sourceWorkbenchId": str(command_data.get("sourceWorkbenchId") or ""),
+        "sourceToolbarTitle": str(command_data.get("sourceToolbarTitle") or ""),
+    }
+
+    shortcut = _action_shortcut_text(action)
+    if shortcut == "" and not trigger_id.startswith("__commandtab_action__:"):
+        shortcut = _command_shortcut(trigger_id)
+    if shortcut != "":
+        entry["shortcut"] = shortcut
+    return entry
+
+
+def _append_command_subaction_entries(
+    entries: list[dict],
+    parent_command_name: str,
+    action,
+    path: list[int],
+    command_data: dict,
+    seen_ids: set[str],
+    source: str = "commandActions",
+) -> None:
+    if action is None or _is_separator_action(action):
+        return
+
+    menu_actions = _action_menu_actions(action)
+    if len(menu_actions) > 0:
+        for index, child_action in enumerate(menu_actions):
+            _append_command_subaction_entries(
+                entries,
+                parent_command_name,
+                child_action,
+                [*path, index],
+                command_data,
+                seen_ids,
+                source,
+            )
+        return
+
+    entry = _build_command_subaction_entry(
+        parent_command_name,
+        action,
+        path,
+        command_data,
+        source,
+    )
+    if entry is None:
+        return
+    entry_id = str(entry.get("id") or "")
+    if entry_id == "" or entry_id in seen_ids:
+        return
+    seen_ids.add(entry_id)
+    entries.append(entry)
+
+
+def _command_subaction_entries(command_name: str, command_data: dict) -> list[dict]:
+    if command_name.startswith("__commandtab_action__:"):
+        return []
+    try:
+        command = Gui.Command.get(command_name)
+        actions = list(command.getAction()) if command is not None else []
+    except Exception:
+        return []
+    if len(actions) == 0:
+        return []
+
+    entries: list[dict] = []
+    seen_ids: set[str] = {command_name}
+    include_plain_command_actions = len(actions) > 1
+    for index, action in enumerate(actions):
+        menu_actions = _action_menu_actions(action)
+        if len(menu_actions) == 0 and not include_plain_command_actions:
+            continue
+        _append_command_subaction_entries(
+            entries,
+            command_name,
+            action,
+            [index],
+            command_data,
+            seen_ids,
+        )
+
+    for index, action in enumerate(_toolbar_menu_actions_for_command(command_name)):
+        _append_command_subaction_entries(
+            entries,
+            command_name,
+            action,
+            [index],
+            command_data,
+            seen_ids,
+            "toolbarMenu",
+        )
+    return entries
+
+
+def _command_subaction_signature(menu_commands: list[dict]) -> tuple[tuple[str, str], ...]:
+    signature = []
+    for command in menu_commands:
+        signature.append((str(command.get("id") or ""), str(command.get("text") or "")))
+    return tuple(signature)
 
 
 def _resolve_structure_path() -> Path:
@@ -3876,7 +4340,15 @@ def _build_command_entry(command_name: str, command_data: dict) -> dict:
     icon_hint = str(command_data.get("icon") or "")
     normalized_size = size if size in ["small", "medium", "large"] else "small"
     text_visible = _resolved_command_text_visibility(command_data, normalized_size)
-    cache_key = (command_name, text, normalized_size, icon_hint, str(bool(text_visible)))
+    menu_commands = _command_subaction_entries(command_name, command_data)
+    cache_key = (
+        command_name,
+        text,
+        normalized_size,
+        icon_hint,
+        str(bool(text_visible)),
+        _command_subaction_signature(menu_commands),
+    )
 
     cached_entry = _COMMAND_ENTRY_CACHE.get(cache_key)
     if cached_entry is not None:
@@ -3895,6 +4367,8 @@ def _build_command_entry(command_name: str, command_data: dict) -> dict:
     }
     if shortcut:
         entry["shortcut"] = shortcut
+    if menu_commands:
+        entry["menuCommands"] = menu_commands
     _COMMAND_ENTRY_CACHE[cache_key] = entry
     return _coerce_dict(entry)
 
@@ -6344,6 +6818,14 @@ class NativeCommandTabController:
 
         if command_name in ["__commandtab_toggle_grid__", "Draft_ToggleGrid"]:
             _run_grid_toggle_command()
+            return
+
+        if command_name.startswith("__commandtab_action__:"):
+            encoded_payload = command_name.split(":", 1)[1]
+            try:
+                _trigger_encoded_command_action(encoded_payload)
+            except Exception:
+                _logger.exception("commandtab encoded action trigger failed")
             return
 
         try:

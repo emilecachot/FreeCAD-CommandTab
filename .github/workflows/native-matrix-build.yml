@@ -1,62 +1,144 @@
-name: Native Matrix Build
+name: Native Multi-OS Build
 
 on:
   workflow_dispatch:
+    inputs:
+      qt_version:
+        description: Qt version used for the native backend build
+        required: true
+        default: 6.8.3
+      upload_package:
+        description: Build and upload the merged addon package
+        required: true
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+env:
+  QT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.qt_version || '6.8.3' }}
+  QT_MAJOR: "6"
 
 jobs:
   build-native:
+    name: Build native backend (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        qt_major: [5, 6]
-    runs-on: ${{ matrix.os }}
+        include:
+          - name: Linux x64
+            os: ubuntu-24.04
+            platform: linux
+          - name: Windows x64
+            os: windows-2022
+            platform: windows
+          - name: macOS Apple Silicon
+            os: macos-14
+            platform: macos
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-x11-0
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: ${{ matrix.qt_major == 5 && '5.15.2' || '6.6.3' }}
+          version: ${{ env.QT_VERSION }}
+          target: desktop
           cache: true
+          setup-python: false
+          install-deps: true
+          archives: qtbase qtsvg
 
-      - name: Configure
+      - name: Configure native backend
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $buildDir = "build/native-${{ matrix.platform }}-qt${{ env.QT_MAJOR }}"
+          $outputDir = Join-Path $env:GITHUB_WORKSPACE "artifacts/native/${{ matrix.platform }}/qt${{ env.QT_MAJOR }}"
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+
+          $configureArgs = @(
+            "-S", "freecad_commandtab/native/cpp",
+            "-B", $buildDir,
+            "-DFREECAD_COMMANDTAB_QT_MAJOR_VERSION=${{ env.QT_MAJOR }}",
+            "-DFREECAD_COMMANDTAB_NATIVE_OUTPUT_DIR=$outputDir",
+            "-DCMAKE_BUILD_TYPE=Release"
+          )
+
+          if ("${{ runner.os }}" -eq "Windows") {
+            $configureArgs = @("-G", "Visual Studio 17 2022", "-A", "x64") + $configureArgs
+          }
+
+          if ("${{ matrix.platform }}" -eq "macos") {
+            $configureArgs += "-DCMAKE_OSX_ARCHITECTURES=arm64"
+            $configureArgs += "-DCMAKE_OSX_DEPLOYMENT_TARGET=12.0"
+          }
+
+          cmake @configureArgs
+
+      - name: Build native backend
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          cmake --build "build/native-${{ matrix.platform }}-qt${{ env.QT_MAJOR }}" --config Release --parallel
+
+      - name: Verify native backend output
         run: >
-          cmake -S freecad_commandtab/native/cpp -B build/native
-          -DFREECAD_COMMANDTAB_QT_MAJOR_VERSION=${{ matrix.qt_major }}
-          -DFREECAD_COMMANDTAB_NATIVE_OUTPUT_DIR=${{ github.workspace }}/artifacts/native/${{ runner.os == 'Linux' && 'linux' || runner.os == 'Windows' && 'windows' || 'macos' }}/qt${{ matrix.qt_major }}
+          python tools/verify_native_matrix.py
+          --root artifacts/native
+          --platform ${{ matrix.platform }}
+          --qt qt${{ env.QT_MAJOR }}
+          --require-full-matrix
 
-      - name: Build
-        run: cmake --build build/native --config Release --parallel
-
-      - name: Upload Native Artifact
+      - name: Upload native backend
         uses: actions/upload-artifact@v4
         with:
-          name: native-${{ runner.os == 'Linux' && 'linux' || runner.os == 'Windows' && 'windows' || 'macos' }}-qt${{ matrix.qt_major }}
-          path: artifacts/native/${{ runner.os == 'Linux' && 'linux' || runner.os == 'Windows' && 'windows' || 'macos' }}/qt${{ matrix.qt_major }}
+          name: native-${{ matrix.platform }}-qt${{ env.QT_MAJOR }}
+          path: artifacts/native/${{ matrix.platform }}/qt${{ env.QT_MAJOR }}
           if-no-files-found: error
 
   assemble-addon:
-    name: Assemble Multi-OS Addon
-    runs-on: ubuntu-latest
+    name: Assemble multi-OS addon
+    runs-on: ubuntu-24.04
     needs: build-native
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_package }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Native Artifacts
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download native artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: native-*
           path: _native_artifacts
 
-      - name: Merge Native Matrix Into Addon Tree
+      - name: Merge native backends into addon tree
         shell: bash
         run: |
           set -euo pipefail
           rm -rf freecad_commandtab/native/bin
           mkdir -p freecad_commandtab/native/bin
+
           find _native_artifacts -type f \( -name '*.so' -o -name '*.dll' -o -name '*.dylib' \) | while read -r lib; do
             rel="${lib#_native_artifacts/}"
             artifact_name="${rel%%/*}"
@@ -67,20 +149,59 @@ jobs:
             mkdir -p "$target_dir"
             cp "$lib" "$target_dir/"
           done
+
           find freecad_commandtab/native/bin -maxdepth 4 -type f | sort
 
-      - name: Verify Full Native Matrix
-        run: python tools/verify_native_matrix.py --root freecad_commandtab/native/bin --require-full-matrix
+      - name: Verify merged Qt6 matrix
+        run: >
+          python tools/verify_native_matrix.py
+          --root freecad_commandtab/native/bin
+          --platform linux
+          --platform macos
+          --platform windows
+          --qt qt6
+          --require-full-matrix
 
-      - name: Build Addon Package Folder
-        run: python tools/package_addon.py --output dist/FreeCAD-CommandTab
+      - name: Build addon package folder
+        run: python tools/package_addon.py --output dist/CommandTab
 
-      - name: Verify Packaged Matrix
-        run: python tools/verify_native_matrix.py --root dist/FreeCAD-CommandTab/freecad_commandtab/native/bin --require-full-matrix
+      - name: Verify packaged Qt6 matrix
+        run: >
+          python tools/verify_native_matrix.py
+          --root dist/CommandTab/freecad_commandtab/native/bin
+          --platform linux
+          --platform macos
+          --platform windows
+          --qt qt6
+          --require-full-matrix
 
-      - name: Upload Multi-OS Addon Artifact
+      - name: Create package zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import shutil
+          from pathlib import Path
+
+          archive = shutil.make_archive(
+              str(Path("dist") / "FreeCAD-CommandTab-multi-os-qt6"),
+              "zip",
+              root_dir="dist",
+              base_dir="CommandTab",
+          )
+          print(archive)
+          PY
+
+      - name: Upload multi-OS addon folder
         uses: actions/upload-artifact@v4
         with:
-          name: FreeCAD-CommandTab-multi-os
-          path: dist/FreeCAD-CommandTab
+          name: FreeCAD-CommandTab-multi-os-qt6
+          path: dist/CommandTab
+          if-no-files-found: error
+
+      - name: Upload multi-OS addon zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeCAD-CommandTab-multi-os-qt6-zip
+          path: dist/FreeCAD-CommandTab-multi-os-qt6.zip
           if-no-files-found: error

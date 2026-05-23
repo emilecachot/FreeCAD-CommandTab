@@ -3978,13 +3978,12 @@ QWidget#CommandTabWorkbenchViewport {
                         dispatchCommand(menuCommand.id, panelKey);
                     });
                 }
-                button->setPopupMode(QToolButton::InstantPopup);
+                button->setPopupMode(QToolButton::MenuButtonPopup);
                 button->setMenu(menu);
-            } else {
-                connect(button, &QToolButton::clicked, this, [this, panelKey, command]() {
-                    dispatchCommand(command.id, panelKey);
-                });
             }
+            connect(button, &QToolButton::clicked, this, [this, panelKey, command]() {
+                dispatchCommand(command.id, panelKey);
+            });
             bindWidgetEnabledToCommand(button, command.id);
             return button;
         }

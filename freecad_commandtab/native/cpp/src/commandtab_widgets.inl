@@ -346,6 +346,8 @@ protected:
     {
         m_hovered = false;
         m_pressed = false;
+        m_dropdownHovered = false;
+        m_dropdownPressed = false;
         update();
         QWidget::leaveEvent(event);
     }
@@ -385,12 +387,20 @@ protected:
 
     void keyPressEvent(QKeyEvent* event) override
     {
+        if (
+            hasMenuCommands()
+            && (
+                event->key() == Qt::Key_Down
+                || (event->key() == Qt::Key_Space && event->modifiers().testFlag(Qt::AltModifier))
+                || (event->key() == Qt::Key_Return && event->modifiers().testFlag(Qt::AltModifier))
+                || (event->key() == Qt::Key_Enter && event->modifiers().testFlag(Qt::AltModifier))
+            )
+        ) {
+            showMenu();
+            event->accept();
+            return;
+        }
         if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter || event->key() == Qt::Key_Space) {
-            if (hasMenuCommands()) {
-                showMenu();
-                event->accept();
-                return;
-            }
             if (m_triggeredHandler) {
                 m_triggeredHandler();
             }
@@ -400,10 +410,21 @@ protected:
         QWidget::keyPressEvent(event);
     }
 
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        const bool nextDropdownHovered = hasMenuCommands() && dropdownHotZoneRect().contains(event->pos());
+        if (m_dropdownHovered != nextDropdownHovered) {
+            m_dropdownHovered = nextDropdownHovered;
+            update();
+        }
+        QWidget::mouseMoveEvent(event);
+    }
+
     void mousePressEvent(QMouseEvent* event) override
     {
         if (event->button() == Qt::LeftButton) {
             m_pressed = true;
+            m_dropdownPressed = hasMenuCommands() && dropdownHotZoneRect().contains(event->pos());
             update();
             event->accept();
             return;
@@ -415,10 +436,14 @@ protected:
     {
         const bool shouldTrigger =
             m_pressed && event->button() == Qt::LeftButton && rect().contains(event->pos());
+        const bool shouldShowMenu =
+            shouldTrigger && hasMenuCommands() && dropdownHotZoneRect().contains(event->pos());
         m_pressed = false;
+        m_dropdownPressed = false;
+        m_dropdownHovered = hasMenuCommands() && rect().contains(event->pos()) && dropdownHotZoneRect().contains(event->pos());
         update();
         if (shouldTrigger) {
-            if (hasMenuCommands()) {
+            if (shouldShowMenu) {
                 showMenu();
                 event->accept();
                 return;
@@ -469,9 +494,40 @@ private:
             } else if (m_buttonSize == CommandTabButtonSizeKind::Large) {
                 minimumEdge = scaledPx(34);
             }
-            return std::max(minimumEdge, m_iconOnlySize + m_compactButtonPadding * 2 + 2);
+            return std::max(
+                minimumEdge,
+                m_iconOnlySize + m_compactButtonPadding * 2 + 2 + dropdownReservedWidth()
+            );
         }
-        return std::max(scaledPx(52), m_iconOnlySize + (m_compactButtonPadding + 1) * 2 + 2);
+        return std::max(
+            scaledPx(52) + dropdownReservedWidth(),
+            m_iconOnlySize + (m_compactButtonPadding + 1) * 2 + 2 + dropdownReservedWidth()
+        );
+    }
+
+    int dropdownButtonWidth() const
+    {
+        if (!hasMenuCommands()) {
+            return 0;
+        }
+        if (!m_textVisible) {
+            return scaledPx(11);
+        }
+        return scaledPx(18);
+    }
+
+    int dropdownReservedWidth() const
+    {
+        return hasMenuCommands() ? dropdownButtonWidth() : 0;
+    }
+
+    QRect dropdownHotZoneRect() const
+    {
+        const int zoneWidth = dropdownButtonWidth();
+        if (zoneWidth <= 0 || rect().isEmpty()) {
+            return QRect();
+        }
+        return QRect(rect().right() - zoneWidth + 1, rect().top(), zoneWidth, rect().height());
     }
 
     int maxDisplayLines() const
@@ -539,7 +595,7 @@ private:
         } else if (m_buttonSize == CommandTabButtonSizeKind::Medium) {
             const int textWidth = std::max(
                 scaledPx(56),
-                m_assignedWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8)
+                m_assignedWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8) - dropdownReservedWidth()
             );
             const QStringList exactLines = wrapCommandTabTextExact(m_rawText, metrics, textWidth);
             if (exactLines.size() <= maxDisplayLines()) {
@@ -550,7 +606,7 @@ private:
         } else {
             const int textWidth = std::max(
                 scaledPx(50),
-                m_assignedWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8)
+                m_assignedWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8) - dropdownReservedWidth()
             );
             const QStringList exactLines = wrapCommandTabTextExact(m_rawText, metrics, textWidth);
             if (exactLines.size() <= maxDisplayLines()) {
@@ -584,7 +640,7 @@ private:
         if (m_buttonSize == CommandTabButtonSizeKind::Large) {
             const int textWidth = std::max(
                 scaledPx(64),
-                (m_assignedWidth > 0 ? m_assignedWidth : scaledPx(110)) - scaledPx(18)
+                (m_assignedWidth > 0 ? m_assignedWidth : scaledPx(110)) - scaledPx(18) - dropdownReservedWidth()
             );
             const QRect textBounds = metrics.boundingRect(
                 QRect(0, 0, textWidth, 1000),
@@ -593,7 +649,7 @@ private:
             );
             const int width = std::max(
                 m_assignedWidth > 0 ? m_assignedWidth : scaledPx(110),
-                textBounds.width() + scaledPx(20)
+                textBounds.width() + scaledPx(20) + dropdownReservedWidth()
             );
             return QSize(width, buttonHeight);
         }
@@ -611,6 +667,7 @@ private:
                 - iconBandWidth
                 - scaledPx(10)
                 - scaledPx(8)
+                - dropdownReservedWidth()
         );
         const QRect textBounds = metrics.boundingRect(
             QRect(0, 0, textWidth, 1000),
@@ -619,7 +676,7 @@ private:
         );
         const int width = std::max(
             m_assignedWidth > 0 ? m_assignedWidth : (medium ? scaledPx(108) : scaledPx(90)),
-            scaledPx(8) + iconBandWidth + scaledPx(8) + textBounds.width() + scaledPx(8)
+            scaledPx(8) + iconBandWidth + scaledPx(8) + textBounds.width() + scaledPx(8) + dropdownReservedWidth()
         );
         return QSize(width, buttonHeight);
     }
@@ -810,6 +867,7 @@ private:
             painter->drawLine(surfaceRect.left() + scaledPx(4), lineY, surfaceRect.right() - scaledPx(4), lineY);
         }
         paintGlassSpecularLayer(painter, surfaceRect, scaledPx(5));
+        paintDropdownHotZone(painter, surfaceRect);
         const int desiredPlateEdge = m_textVisible
             ? std::max(scaledPx(42), iconEdge + scaledPx(6))
             : (iconEdge + scaledPx(6));
@@ -852,7 +910,7 @@ private:
             paintDropdownIndicator(
                 painter,
                 QRect(
-                    contentRect.right() - scaledPx(12),
+                    dropdownHotZoneRect().center().x() - scaledPx(4),
                     contentRect.top() + scaledPx(6),
                     scaledPx(8),
                     scaledPx(8)
@@ -868,7 +926,7 @@ private:
         QRect textRect(
             contentRect.left(),
             contentRect.bottom() - reservedTextHeight,
-            contentRect.width(),
+            std::max(scaledPx(36), contentRect.width() - dropdownReservedWidth()),
             reservedTextHeight
         );
         painter->drawText(
@@ -925,6 +983,7 @@ private:
             painter->drawLine(surfaceRect.left() + scaledPx(3), lineY, surfaceRect.right() - scaledPx(3), lineY);
         }
         paintGlassSpecularLayer(painter, surfaceRect, scaledPx(5));
+        paintDropdownHotZone(painter, surfaceRect);
         const int iconPlateLeft = m_textVisible
             ? contentRect.left()
             : contentRect.left() + std::max(0, (contentRect.width() - iconBandWidth) / 2);
@@ -957,13 +1016,13 @@ private:
         if (hasMenuCommands()) {
             const QRect dropdownRect = m_textVisible
                 ? QRect(
-                    contentRect.right() - scaledPx(10),
+                    dropdownHotZoneRect().center().x() - scaledPx(4),
                     contentRect.top() + scaledPx(4),
                     scaledPx(8),
                     scaledPx(8)
                 )
                 : QRect(
-                    contentRect.right() - scaledPx(5),
+                    dropdownHotZoneRect().center().x() - scaledPx(2),
                     contentRect.top() + scaledPx(1),
                     scaledPx(4),
                     scaledPx(4)
@@ -980,7 +1039,10 @@ private:
         QRect textRect(
             contentRect.left() + iconPlateRect.width() + scaledPx(8),
             textTop,
-            std::max(scaledPx(36), contentRect.width() - iconPlateRect.width() - scaledPx(10)),
+            std::max(
+                scaledPx(36),
+                contentRect.width() - iconPlateRect.width() - scaledPx(10) - dropdownReservedWidth()
+            ),
             reservedTextHeight
         );
         painter->drawText(
@@ -1013,6 +1075,53 @@ private:
                  << QPoint(rect.right(), rect.top() + scaledPx(2))
                  << QPoint(rect.center().x(), rect.bottom());
         painter->drawPolygon(triangle);
+        painter->restore();
+    }
+
+    void paintDropdownHotZone(QPainter* painter, const QRect& surfaceRect) const
+    {
+        if (painter == nullptr || m_theme == nullptr || !hasMenuCommands()) {
+            return;
+        }
+
+        const QRect zoneRect = dropdownHotZoneRect().intersected(surfaceRect);
+        if (!zoneRect.isValid()) {
+            return;
+        }
+
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        if (m_dropdownHovered || m_dropdownPressed) {
+            const QColor fill = withAlpha(
+                blendColors(
+                    m_theme->buttonActiveTop,
+                    m_theme->tabAccent,
+                    m_dropdownPressed ? 0.28 : 0.16
+                ),
+                m_dropdownPressed ? 98 : 62
+            );
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(fill);
+            painter->drawRoundedRect(
+                zoneRect.adjusted(0, scaledPx(1), -scaledPx(1), -scaledPx(1)),
+                scaledPx(4),
+                scaledPx(4)
+            );
+        }
+
+        if (m_textVisible) {
+            const QColor separatorColor = withAlpha(
+                m_theme->buttonActiveBorder,
+                (m_dropdownHovered || m_dropdownPressed) ? 132 : 78
+            );
+            painter->setPen(QPen(separatorColor, std::max<qreal>(1.0, displayScaleFactor())));
+            painter->drawLine(
+                zoneRect.left(),
+                zoneRect.top() + scaledPx(7),
+                zoneRect.left(),
+                zoneRect.bottom() - scaledPx(7)
+            );
+        }
         painter->restore();
     }
 
@@ -1169,7 +1278,8 @@ QMenu::separator {
             scaledPx(10)
         );
         menu.setMask(QRegion(clipPath.toFillPolygon().toPolygon()));
-        menu.exec(mapToGlobal(rect().bottomLeft()));
+        const QRect popupAnchor = hasMenuCommands() ? dropdownHotZoneRect() : rect();
+        menu.exec(mapToGlobal(QPoint(popupAnchor.left(), rect().bottom() + 1)));
     }
 
     const CommandTabModel::CommandTabTheme* m_theme = nullptr;
@@ -1192,6 +1302,8 @@ QMenu::separator {
     bool m_textVisible = true;
     bool m_hovered = false;
     bool m_pressed = false;
+    bool m_dropdownHovered = false;
+    bool m_dropdownPressed = false;
     bool m_checked = false;
     bool m_inQuickAccess = false;
 
