@@ -51,9 +51,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-x11-0 qt6-base-dev-tools
+          sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-x11-0 qt6-base-dev qt6-base-dev-tools libqt6svg6-dev
 
       - name: Install Qt
+        if: runner.os != 'Linux'
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -86,35 +87,6 @@ jobs:
           if ("${{ matrix.platform }}" -eq "macos") {
             $configureArgs += "-DCMAKE_OSX_ARCHITECTURES=arm64"
             $configureArgs += "-DCMAKE_OSX_DEPLOYMENT_TARGET=12.0"
-          }
-
-          if ("${{ runner.os }}" -eq "Linux") {
-            $rccCandidates = @(
-              "/usr/lib/qt6/libexec/rcc",
-              "/usr/lib/x86_64-linux-gnu/qt6/libexec/rcc",
-              (Get-Command rcc -ErrorAction SilentlyContinue).Source
-            )
-
-            foreach ($candidate in $rccCandidates) {
-              if ($candidate -and (Test-Path $candidate)) {
-                $rccWrapper = Join-Path $env:RUNNER_TEMP "commandtab-rcc"
-                $wrapperLines = @(
-                  "#!/usr/bin/env bash",
-                  "set -e",
-                  'if [ "${1:-}" = "-name" ]; then',
-                  "  shift 2",
-                  "  fi",
-                  "unset LD_LIBRARY_PATH",
-                  "exec '$candidate' " + '"$@"'
-                )
-                Set-Content -Path $rccWrapper -Value $wrapperLines
-                chmod +x $rccWrapper
-
-                Write-Host "Using Linux system rcc wrapper: $rccWrapper -> $candidate"
-                $configureArgs += "-DFREECAD_COMMANDTAB_QT_RCC_EXECUTABLE=$rccWrapper"
-                break
-              }
-            }
           }
 
           cmake @configureArgs
