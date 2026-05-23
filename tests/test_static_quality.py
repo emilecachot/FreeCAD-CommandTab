@@ -149,10 +149,17 @@ def test_native_dropdown_commands_use_split_button_behavior() -> None:
     assert "include_plain_command_actions = len(actions) > 1" in bridge_text
     assert "from PySide.QtWidgets import QToolBar, QToolButton, QWidget" in bridge_text
     assert "toolbar.findChildren(QToolButton)" in bridge_text
+    assert 'os.environ.get("FREECAD_COMMANDTAB_CPP_BOOTSTRAP_PIPELINE", "0")' in bridge_text
+    assert "def _enrich_native_payload_menu_commands" in bridge_text
+    assert "_enrich_native_payload_menu_commands(parsed_payload)" in bridge_text
     assert "dropdownHotZoneRect().contains(event->pos())" in widget_text
+    assert 'setProperty("commandtabHasMenuCommands", !m_menuCommands.isEmpty())' in widget_text
+    assert 'setProperty("commandtabMenuCommandCount", m_menuCommands.size())' in widget_text
     assert "return scaledPx(15)" in widget_text
     assert "shouldShowMenu" in widget_text
     assert "QToolButton::MenuButtonPopup" in shell_text
+    assert "commandtabHasMenuCommands" in shell_text
+    assert "commandtabMenuCommandCount" in shell_text
 
 
 def test_build_script_uses_release_config_by_default() -> None:

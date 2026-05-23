@@ -80,7 +80,7 @@ _WORKBENCH_PRELOAD_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PRELOAD_WORKBENCHES", "0") or "0"
 ).strip().lower() in {"1", "true", "yes", "on"}
 _CPP_BOOTSTRAP_PIPELINE_ENABLED = str(
-    os.environ.get("FREECAD_COMMANDTAB_CPP_BOOTSTRAP_PIPELINE", "1") or "1"
+    os.environ.get("FREECAD_COMMANDTAB_CPP_BOOTSTRAP_PIPELINE", "0") or "0"
 ).strip().lower() not in {"0", "false", "no", "off"}
 _CPP_METADATA_PIPELINE_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_CPP_METADATA_PIPELINE", "1") or "1"
@@ -4408,6 +4408,53 @@ def _build_command_entry(command_name: str, command_data: dict) -> dict:
     return _coerce_dict(entry)
 
 
+def _enrich_native_payload_menu_commands(payload: dict) -> dict:
+    if isinstance(payload, dict) is False:
+        return payload
+
+    def _enrich_command(command: dict) -> None:
+        if isinstance(command, dict) is False:
+            return
+        command_id = str(command.get("id") or "").strip()
+        if command_id == "" or "_separator_" in command_id or command_id.endswith("_separator"):
+            return
+        existing_menu_commands = _coerce_list(command.get("menuCommands", []))
+        if len(existing_menu_commands) == 0:
+            command_data = {
+                "size": str(command.get("size") or "small"),
+                "textVisible": bool(command.get("textVisible", True)),
+                "sourceWorkbenchId": str(command.get("sourceWorkbenchId") or ""),
+                "sourceToolbarTitle": str(command.get("sourceToolbarTitle") or ""),
+            }
+            menu_commands = _command_subaction_entries(command_id, command_data)
+            if menu_commands:
+                command["menuCommands"] = menu_commands
+                existing_menu_commands = menu_commands
+        for menu_command in existing_menu_commands:
+            if isinstance(menu_command, dict):
+                _enrich_command(menu_command)
+
+    for command in _coerce_list(payload.get("quickAccessCommands", [])):
+        if isinstance(command, dict):
+            _enrich_command(command)
+
+    for panel in _coerce_list(payload.get("panels", [])):
+        panel_object = _coerce_dict(panel)
+        for command in _coerce_list(panel_object.get("commands", [])):
+            if isinstance(command, dict):
+                _enrich_command(command)
+
+    for workbench in _coerce_list(payload.get("workbenches", [])):
+        workbench_object = _coerce_dict(workbench)
+        for panel in _coerce_list(workbench_object.get("panels", [])):
+            panel_object = _coerce_dict(panel)
+            for command in _coerce_list(panel_object.get("commands", [])):
+                if isinstance(command, dict):
+                    _enrich_command(command)
+
+    return payload
+
+
 def _panel_title_from_identifier(panel_id: str, suffix: str = "") -> str:
     title = str(panel_id or "")
     if suffix != "" and title.endswith(suffix):
@@ -5020,6 +5067,7 @@ def _build_native_model_payload(include_all_panels: bool = False) -> tuple[str, 
             parsed_payload = None
         if isinstance(parsed_payload, dict):
             parsed_payload = _filter_native_payload_workbenches(parsed_payload)
+            parsed_payload = _enrich_native_payload_menu_commands(parsed_payload)
             parsed_payload["settings"] = json.loads(_native_settings_state_json())
             parsed_payload.pop("themeConfig", None)
             parsed_payload["theme"] = dict(CommandTabTheme.current_theme_tokens())
@@ -6071,6 +6119,14 @@ def _build_native_workbench_payload(workbench_name: str) -> str:
         metadata_cache_path,
         workbench_name,
     )
+    if payload != "":
+        try:
+            parsed_payload = json.loads(payload)
+        except Exception:
+            parsed_payload = None
+        if isinstance(parsed_payload, dict):
+            parsed_payload = _enrich_native_payload_menu_commands(parsed_payload)
+            payload = json.dumps(parsed_payload, ensure_ascii=True, separators=(",", ":"))
     if payload == "":
         payload = json.dumps(
             {
@@ -6884,8 +6940,12 @@ class NativeCommandTabController:
                     workbench=workbench_name,
                     alreadyLoaded=workbench_name in self._loaded_workbenches,
                 )
-                if workbench_name in self._loaded_workbenches and self._set_active_workbench(workbench_name):
-                    return
+                if workbench_name in self._loaded_workbenches:
+                    if self._upsert_workbench(workbench_name, activate=True):
+                        self._schedule_warmup()
+                        return
+                    if self._set_active_workbench(workbench_name):
+                        return
                 if self._upsert_workbench(workbench_name, activate=True) is False:
                     self.refresh(force=True, include_all_panels=False)
                 self._schedule_warmup()

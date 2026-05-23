@@ -22,6 +22,9 @@ public:
 
         m_commandId = command.id;
         m_icon = loadCommandEntryIcon(command);
+        setProperty("commandtabCommandId", command.id);
+        setProperty("commandtabHasMenuCommands", !m_menuCommands.isEmpty());
+        setProperty("commandtabMenuCommandCount", m_menuCommands.size());
 
         QFont nextFont = font();
         nextFont.setPointSize(std::max(7, scaledPx(10)));

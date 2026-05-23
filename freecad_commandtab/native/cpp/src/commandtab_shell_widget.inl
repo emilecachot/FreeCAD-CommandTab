@@ -3096,6 +3096,8 @@ QWidget#CommandTabWorkbenchViewport {
         button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         button->setProperty("commandtabRole", QStringLiteral("panelPopupTool"));
         button->setProperty("commandtabCommandId", command.id);
+        button->setProperty("commandtabHasMenuCommands", !command.menuCommands.isEmpty());
+        button->setProperty("commandtabMenuCommandCount", command.menuCommands.size());
 
         const int iconSize = std::clamp(
             scaledPx(std::clamp(m_settingsState.panelDropdownPopupIconSize, 12, 48)),
@@ -3524,6 +3526,8 @@ QWidget#CommandTabWorkbenchViewport {
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
         button->setProperty("commandtabRole", QStringLiteral("panelSideTool"));
         button->setProperty("commandtabCommandId", command.id);
+        button->setProperty("commandtabHasMenuCommands", !command.menuCommands.isEmpty());
+        button->setProperty("commandtabMenuCommandCount", command.menuCommands.size());
         button->setProperty("commandtabCompactIconOnly", true);
         button->setProperty(
             "commandtabPreferredToolButtonStyle",
@@ -3947,6 +3951,8 @@ QWidget#CommandTabWorkbenchViewport {
             }
             button->setProperty("commandtabRole", QStringLiteral("quick"));
             button->setProperty("commandtabCommandId", command.id);
+            button->setProperty("commandtabHasMenuCommands", !command.menuCommands.isEmpty());
+            button->setProperty("commandtabMenuCommandCount", command.menuCommands.size());
             button->setToolButtonStyle(Qt::ToolButtonIconOnly);
             button->setProperty(
                 "commandtabPreferredToolButtonStyle",
@@ -3990,6 +3996,8 @@ QWidget#CommandTabWorkbenchViewport {
 
         auto* button = new CommandTabCommandButton(command, &m_theme, this);
         button->setProperty("commandtabCommandId", command.id);
+        button->setProperty("commandtabHasMenuCommands", !command.menuCommands.isEmpty());
+        button->setProperty("commandtabMenuCommandCount", command.menuCommands.size());
         button->applySettings(m_settingsState);
         const bool isLargeCommand =
             command.size.trimmed().compare(QStringLiteral("large"), Qt::CaseInsensitive) == 0;
