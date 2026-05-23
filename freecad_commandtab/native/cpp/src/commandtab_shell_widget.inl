@@ -1979,6 +1979,24 @@ QToolButton[commandtabRole="panelPopupTool"] {
     border-radius: 6px;
     padding: 2px 3px;
 }
+QToolButton[commandtabRole="panelPopupTool"][commandtabHasMenuCommands="true"] {
+    padding-right: 14px;
+}
+QToolButton[commandtabRole="panelPopupTool"][commandtabHasMenuCommands="true"]::menu-button {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    width: 13px;
+    border: none;
+    border-left: 1px solid %11;
+    margin: 3px 2px 3px 0px;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    background: %10;
+}
+QToolButton[commandtabRole="panelPopupTool"][commandtabHasMenuCommands="true"]::menu-arrow {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+}
 QToolButton[commandtabRole="panelPopupTool"]:hover {
     background: %10;
     border: 1px solid %11;
@@ -1995,6 +2013,24 @@ QToolButton[commandtabRole="panelSideTool"] {
     border: 1px solid transparent;
     border-radius: 6px;
     padding: 1px;
+}
+QToolButton[commandtabRole="panelSideTool"][commandtabHasMenuCommands="true"] {
+    padding-right: 12px;
+}
+QToolButton[commandtabRole="panelSideTool"][commandtabHasMenuCommands="true"]::menu-button {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    width: 11px;
+    border: none;
+    border-left: 1px solid %11;
+    margin: 2px 1px 2px 0px;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    background: %10;
+}
+QToolButton[commandtabRole="panelSideTool"][commandtabHasMenuCommands="true"]::menu-arrow {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
 }
 QToolButton[commandtabRole="panelSideTool"]:hover {
     background: %10;
@@ -3098,6 +3134,54 @@ QWidget#CommandTabWorkbenchViewport {
         }
     }
 
+    bool attachVariantMenuToToolButton(
+        QToolButton* button,
+        const CommandTabCommandEntry& command,
+        const QString& panelKey = QString(),
+        QMenu* ownerMenuToClose = nullptr
+    )
+    {
+        if (button == nullptr || command.menuCommands.isEmpty()) {
+            return false;
+        }
+
+        auto* menu = new QMenu(button);
+        applyPopupMenuTheme(menu);
+        QPointer<QMenu> guardedOwnerMenu(ownerMenuToClose);
+        for (const auto& menuCommand : command.menuCommands) {
+            if (menuCommand.id.isEmpty()) {
+                continue;
+            }
+            QAction* action = menu->addAction(commandtabCommandDisplayText(menuCommand));
+            const QAction* menuSourceAction = resolveActionForCommandId(menuCommand.id);
+            QIcon menuIcon = loadCommandEntryIcon(menuCommand);
+            if (menuSourceAction != nullptr && !menuSourceAction->icon().isNull()) {
+                menuIcon = menuSourceAction->icon();
+            }
+            if (!menuIcon.isNull()) {
+                action->setIcon(menuIcon);
+            }
+            const QString menuHoverLabel = commandHoverLabel(menuCommand, menuSourceAction);
+            action->setToolTip(menuHoverLabel);
+            action->setStatusTip(menuHoverLabel);
+            bindMenuActionEnabledToCommand(action, menuCommand.id);
+            connect(action, &QAction::triggered, this, [this, panelKey, menuCommand, guardedOwnerMenu]() {
+                dispatchCommand(menuCommand.id, panelKey);
+                if (!guardedOwnerMenu.isNull()) {
+                    guardedOwnerMenu->close();
+                }
+            });
+        }
+        if (menu->isEmpty()) {
+            menu->deleteLater();
+            return false;
+        }
+
+        button->setPopupMode(QToolButton::MenuButtonPopup);
+        button->setMenu(menu);
+        return true;
+    }
+
     QToolButton* createPanelPopupToolButton(
         const CommandTabCommandEntry& command,
         const QString& panelKey,
@@ -3159,18 +3243,20 @@ QWidget#CommandTabWorkbenchViewport {
             );
         }
 
+        const bool hasVariantMenu = attachVariantMenuToToolButton(button, command, panelKey, ownerMenu);
+        const int variantMenuReserve = hasVariantMenu ? scaledPx(14) : 0;
         if (showText) {
             const int textWidth = button->fontMetrics().horizontalAdvance(label);
             const int buttonWidth = std::clamp(
-                std::max(iconSize + scaledPx(14), textWidth + scaledPx(18)),
+                std::max(iconSize + scaledPx(14), textWidth + scaledPx(18) + variantMenuReserve),
                 scaledPx(54),
-                scaledPx(200)
+                scaledPx(220)
             );
             const int buttonHeight = iconSize + button->fontMetrics().height() + scaledPx(16);
             button->setFixedSize(buttonWidth, buttonHeight);
         } else {
             const int edge = iconSize + scaledPx(12);
-            button->setFixedSize(edge, edge);
+            button->setFixedSize(edge + variantMenuReserve, edge);
         }
 
         applyPanelPopupToolButtonTheme(button);
@@ -3558,9 +3644,10 @@ QWidget#CommandTabWorkbenchViewport {
             scaledPx(10),
             scaledPx(72)
         );
+        const bool hasVariantMenu = attachVariantMenuToToolButton(button, command, panelKey);
         const int edge = std::max(scaledPx(28), iconSize + scaledPx(8));
         button->setIconSize(QSize(iconSize, iconSize));
-        button->setFixedSize(edge, edge);
+        button->setFixedSize(edge + (hasVariantMenu ? scaledPx(12) : 0), edge);
 
         QIcon icon = loadCommandEntryIcon(command);
         if (const QAction* sourceAction = resolveActionForCommandId(command.id)) {
@@ -3978,32 +4065,7 @@ QWidget#CommandTabWorkbenchViewport {
             );
             button->setIconSize(quickAccessIconSize());
             button->setFixedSize(scaledHeaderPx(30), scaledHeaderPx(30));
-            if (!command.menuCommands.isEmpty()) {
-                auto* menu = new QMenu(button);
-                applyPopupMenuTheme(menu);
-                for (const auto& menuCommand : command.menuCommands) {
-                    if (menuCommand.id.isEmpty()) {
-                        continue;
-                    }
-                    QAction* action = menu->addAction(commandtabCommandDisplayText(menuCommand));
-                    const QAction* menuSourceAction = resolveActionForCommandId(menuCommand.id);
-                    QIcon menuIcon = loadCommandEntryIcon(menuCommand);
-                    if (menuSourceAction != nullptr && !menuSourceAction->icon().isNull()) {
-                        menuIcon = menuSourceAction->icon();
-                    }
-                    if (!menuIcon.isNull()) {
-                        action->setIcon(menuIcon);
-                    }
-                    const QString menuHoverLabel = commandHoverLabel(menuCommand, menuSourceAction);
-                    action->setToolTip(menuHoverLabel);
-                    action->setStatusTip(menuHoverLabel);
-                    bindMenuActionEnabledToCommand(action, menuCommand.id);
-                    connect(action, &QAction::triggered, this, [this, panelKey, menuCommand]() {
-                        dispatchCommand(menuCommand.id, panelKey);
-                    });
-                }
-                button->setPopupMode(QToolButton::MenuButtonPopup);
-                button->setMenu(menu);
+            if (attachVariantMenuToToolButton(button, command, panelKey)) {
                 button->setFixedWidth(button->width() + scaledHeaderPx(12));
             }
             connect(button, &QToolButton::clicked, this, [this, panelKey, command]() {

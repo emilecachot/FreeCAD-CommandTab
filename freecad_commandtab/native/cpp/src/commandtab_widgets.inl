@@ -879,11 +879,19 @@ private:
             iconEdge + scaledPx(4),
             std::min(contentRect.width(), maxIconAreaHeight)
         );
+        const QRect iconAreaRect = m_textVisible
+            ? contentRect
+            : QRect(
+                contentRect.left(),
+                contentRect.top(),
+                std::max(1, contentRect.width() - dropdownReservedWidth()),
+                contentRect.height()
+            );
         const QRect iconPlateRect = m_textVisible
             ? QRect(contentRect.left(), contentRect.top(), plateEdge, plateEdge)
             : QRect(
-                contentRect.left() + std::max(0, (contentRect.width() - plateEdge) / 2),
-                contentRect.top() + std::max(0, (contentRect.height() - plateEdge) / 2),
+                iconAreaRect.left() + std::max(0, (iconAreaRect.width() - plateEdge) / 2),
+                iconAreaRect.top() + std::max(0, (iconAreaRect.height() - plateEdge) / 2),
                 plateEdge,
                 plateEdge
             );
@@ -987,12 +995,20 @@ private:
         }
         paintGlassSpecularLayer(painter, surfaceRect, scaledPx(5));
         paintDropdownHotZone(painter, surfaceRect);
+        const QRect iconAreaRect = m_textVisible
+            ? contentRect
+            : QRect(
+                contentRect.left(),
+                contentRect.top(),
+                std::max(1, contentRect.width() - dropdownReservedWidth()),
+                contentRect.height()
+            );
         const int iconPlateLeft = m_textVisible
             ? contentRect.left()
-            : contentRect.left() + std::max(0, (contentRect.width() - iconBandWidth) / 2);
+            : iconAreaRect.left() + std::max(0, (iconAreaRect.width() - iconBandWidth) / 2);
         const int iconPlateTop = m_textVisible
             ? (contentRect.top() + (medium ? scaledPx(1) : 0))
-            : (contentRect.top() + std::max(0, (contentRect.height() - iconBandWidth) / 2));
+            : (iconAreaRect.top() + std::max(0, (iconAreaRect.height() - iconBandWidth) / 2));
         const QRect iconPlateRect(iconPlateLeft, iconPlateTop, iconBandWidth, iconBandWidth);
         QRect iconRect(
             iconPlateRect.left() + (iconPlateRect.width() - iconEdge) / 2,
