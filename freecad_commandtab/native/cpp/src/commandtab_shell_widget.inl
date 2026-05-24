@@ -358,13 +358,17 @@ public:
             return;
         }
 
+        const QString normalizedCommandId = normalizeActionCandidate(commandId);
+        widget->setProperty("commandtabEnabledBindingCommandId", normalizedCommandId);
         QAction* sourceAction = resolveActionForCommandId(commandId);
         if (sourceAction == nullptr) {
             widget->setEnabled(true);
+            widget->setProperty("commandtabEnabledBindingConnected", false);
             return;
         }
 
         widget->setEnabled(sourceAction->isEnabled());
+        widget->setProperty("commandtabEnabledBindingConnected", true);
         QPointer<QWidget> guardedWidget(widget);
         QPointer<QAction> guardedAction(sourceAction);
         connect(sourceAction, &QAction::changed, widget, [guardedWidget, guardedAction]() {
@@ -412,12 +416,16 @@ public:
             return;
         }
 
+        const QString normalizedCommandId = normalizeActionCandidate(commandId);
+        button->setProperty("commandtabCheckedBindingCommandId", normalizedCommandId);
         QAction* sourceAction = resolveActionForCommandId(commandId);
         if (sourceAction == nullptr) {
+            button->setProperty("commandtabCheckedBindingConnected", false);
             return;
         }
 
         button->setChecked(sourceAction->isChecked());
+        button->setProperty("commandtabCheckedBindingConnected", true);
         QPointer<CommandTabCommandButton> guardedButton(button);
         QPointer<QAction> guardedAction(sourceAction);
         connect(sourceAction, &QAction::changed, button, [guardedButton, guardedAction]() {
@@ -510,10 +518,12 @@ public:
             scheduleBackgroundPageWarmup();
             scheduleFullPagePreload();
         }
+        startCommandStatePolling();
         applyTabTextColors();
         updateTabNavigationButtons();
         scheduleWorkbenchTabIconRefresh(80);
         scheduleCommandIconRefresh(10, 4);
+        scheduleCommandStateRefresh(20, 6);
 
         setUpdatesEnabled(true);
         updateGeometry();
@@ -541,6 +551,7 @@ public:
         scheduleBackgroundPageWarmup();
         scheduleWorkbenchTabIconRefresh(80);
         scheduleCommandIconRefresh(30, 2);
+        scheduleCommandStateRefresh(30, 4);
         return true;
     }
 
@@ -761,6 +772,7 @@ public:
         scheduleBackgroundPageWarmup();
         scheduleFullPagePreload();
         scheduleCommandIconRefresh(30, 2);
+        scheduleCommandStateRefresh(30, 4);
         return true;
     }
 
@@ -1136,6 +1148,70 @@ private:
         }
     }
 
+    void refreshCommandStatesFromActions()
+    {
+        invalidateActionLookup();
+        rebuildActionLookup();
+
+        QList<QWidget*> scanRoots;
+        scanRoots.push_back(this);
+        if (m_topBarWidget != nullptr) {
+            scanRoots.push_back(m_topBarWidget);
+        }
+        if (m_stack != nullptr && m_stack->currentWidget() != nullptr) {
+            scanRoots.push_back(m_stack->currentWidget());
+        }
+
+        QSet<QWidget*> visitedRoots;
+        for (QWidget* root : scanRoots) {
+            if (root == nullptr || visitedRoots.contains(root)) {
+                continue;
+            }
+            visitedRoots.insert(root);
+
+            const auto scopedWidgets = root->findChildren<QWidget*>();
+            for (auto* scopedWidget : scopedWidgets) {
+                if (scopedWidget == nullptr) {
+                    continue;
+                }
+
+                QString commandId = scopedWidget->property("commandtabEnabledBindingCommandId").toString().trimmed();
+                if (commandId.isEmpty()) {
+                    commandId = scopedWidget->property("commandtabCommandId").toString().trimmed();
+                }
+                if (!commandId.isEmpty()) {
+                    QAction* sourceAction = resolveActionForCommandId(commandId);
+                    if (sourceAction != nullptr) {
+                        scopedWidget->setEnabled(sourceAction->isEnabled());
+                        if (!scopedWidget->property("commandtabEnabledBindingConnected").toBool()) {
+                            bindWidgetEnabledToCommand(scopedWidget, commandId);
+                        }
+                    }
+                }
+
+                auto* commandButton = dynamic_cast<CommandTabCommandButton*>(scopedWidget);
+                if (commandButton == nullptr) {
+                    continue;
+                }
+                QString checkedCommandId = commandButton->property("commandtabCheckedBindingCommandId").toString().trimmed();
+                if (checkedCommandId.isEmpty()) {
+                    checkedCommandId = commandButton->property("commandtabCommandId").toString().trimmed();
+                }
+                if (checkedCommandId.isEmpty()) {
+                    continue;
+                }
+                QAction* checkedAction = resolveActionForCommandId(checkedCommandId);
+                if (checkedAction == nullptr) {
+                    continue;
+                }
+                commandButton->setChecked(checkedAction->isChecked());
+                if (!commandButton->property("commandtabCheckedBindingConnected").toBool()) {
+                    bindWidgetCheckedToCommand(commandButton, checkedCommandId);
+                }
+            }
+        }
+    }
+
     void scheduleCommandIconRefresh(int delayMs = 220, int passes = 1)
     {
         if (passes <= 0) {
@@ -1156,6 +1232,41 @@ private:
             });
         }
         m_commandIconRefreshTimer->start(std::clamp(delayMs, 0, 3000));
+    }
+
+    void scheduleCommandStateRefresh(int delayMs = 120, int passes = 1)
+    {
+        if (passes <= 0) {
+            return;
+        }
+        m_pendingCommandStateRefreshPasses = std::max(m_pendingCommandStateRefreshPasses, passes);
+        if (m_commandStateRefreshTimer == nullptr) {
+            m_commandStateRefreshTimer = new QTimer(this);
+            m_commandStateRefreshTimer->setSingleShot(true);
+            connect(m_commandStateRefreshTimer, &QTimer::timeout, this, [this]() {
+                refreshCommandStatesFromActions();
+                if (m_pendingCommandStateRefreshPasses > 1) {
+                    --m_pendingCommandStateRefreshPasses;
+                    m_commandStateRefreshTimer->start(180);
+                } else {
+                    m_pendingCommandStateRefreshPasses = 0;
+                }
+            });
+        }
+        m_commandStateRefreshTimer->start(std::clamp(delayMs, 0, 3000));
+    }
+
+    void startCommandStatePolling()
+    {
+        if (m_commandStatePollTimer != nullptr) {
+            return;
+        }
+        m_commandStatePollTimer = new QTimer(this);
+        m_commandStatePollTimer->setInterval(750);
+        connect(m_commandStatePollTimer, &QTimer::timeout, this, [this]() {
+            refreshCommandStatesFromActions();
+        });
+        m_commandStatePollTimer->start();
     }
 
     int headerScalePercent() const
@@ -3177,6 +3288,7 @@ QWidget#CommandTabWorkbenchViewport {
         if (m_commandHandler) {
             m_commandHandler(normalizedCommandId);
         }
+        scheduleCommandStateRefresh(80, 5);
         if (!normalizedCommandId.startsWith(QStringLiteral("__workbench__:"))) {
             startAutoHideCountdown();
         }
@@ -4402,7 +4514,10 @@ private:
     QTimer* m_hoverTabTimer = nullptr;
     QTimer* m_tabIconRefreshTimer = nullptr;
     QTimer* m_commandIconRefreshTimer = nullptr;
+    QTimer* m_commandStateRefreshTimer = nullptr;
+    QTimer* m_commandStatePollTimer = nullptr;
     int m_pendingCommandIconRefreshPasses = 0;
+    int m_pendingCommandStateRefreshPasses = 0;
     int m_hoverTabPending = -1;
     bool m_ribbonCollapsed = false;
     bool m_updatingTabScrollButtonLayout = false;

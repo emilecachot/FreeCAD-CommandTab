@@ -169,6 +169,21 @@ def test_native_dropdown_commands_use_split_button_behavior() -> None:
     assert "QToolButton::MenuButtonPopup" in shell_text
     assert "commandtabHasMenuCommands" in shell_text
     assert "commandtabMenuCommandCount" in shell_text
+    assert "def _load_static_command_variant_menu_specs() -> dict[str, list[object]]:" in bridge_text
+
+
+def test_native_command_enable_state_refreshes_globally() -> None:
+    shell_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl"
+    ).read_text(encoding="utf-8")
+
+    assert "refreshCommandStatesFromActions()" in shell_text
+    assert "scheduleCommandStateRefresh(20, 6)" in shell_text
+    assert "scheduleCommandStateRefresh(80, 5)" in shell_text
+    assert "startCommandStatePolling()" in shell_text
+    assert "commandtabEnabledBindingCommandId" in shell_text
+    assert "commandtabCheckedBindingCommandId" in shell_text
+    assert "m_commandStatePollTimer->setInterval(750)" in shell_text
 
 
 def test_build_script_uses_release_config_by_default() -> None:
