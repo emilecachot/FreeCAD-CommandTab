@@ -88,6 +88,7 @@ def test_native_controller_exposes_close_lifecycle() -> None:
 def test_package_script_excludes_generated_state() -> None:
     assert package_addon.should_skip(ROOT / "build")
     assert package_addon.should_skip(ROOT / "dist")
+    assert package_addon.should_skip(ROOT / "_native_artifacts")
     assert package_addon.should_skip(ROOT / ".venv")
     assert package_addon.should_skip(ROOT / "freecad_commandtab" / "native" / "bin" / "windows" / "qt6" / "freecad_commandtab_native_backend.pdb")
     assert package_addon.should_skip(ROOT / "freecad_commandtab" / "native" / "bin" / "windows" / "qt6" / "freecad_commandtab_native_backend.ilk")

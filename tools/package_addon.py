@@ -19,6 +19,7 @@ EXCLUDED_DIRS = {
     ".qt",
     ".venv",
     ".venv-qt68",
+    "_native_artifacts",
     "__pycache__",
     "build",
     "dist",
