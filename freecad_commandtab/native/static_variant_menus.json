@@ -1,0 +1,602 @@
+{
+  "cacheVersion": 1,
+  "commands": {
+    "Part_Datums": [
+      "Part_CoordinateSystem",
+      "Part_DatumPlane",
+      "Part_DatumLine",
+      "Part_DatumPoint"
+    ],
+    "Std_LinkActions": [
+      "Std_LinkMake",
+      "Std_LinkMakeRelative",
+      "Std_LinkReplace",
+      "Std_LinkUnlink",
+      "Std_LinkImport",
+      "Std_LinkImportAll"
+    ],
+    "Assembly_Insert": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQXNzZW1ibHlfSW5zZXJ0IiwicGF0aCI6WzBdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Component"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQXNzZW1ibHlfSW5zZXJ0IiwicGF0aCI6WzFdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "New Part"
+      }
+    ],
+    "Assembly_CreateJointGearBelt": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQXNzZW1ibHlfQ3JlYXRlSm9pbnRHZWFyQmVsdCIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Gears Joint"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQXNzZW1ibHlfQ3JlYXRlSm9pbnRHZWFyQmVsdCIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Belt Joint"
+      }
+    ],
+    "BIM_GenericTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0dlbmVyaWNUb29scyIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Profil\u00e9"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0dlbmVyaWNUb29scyIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Bo\u00eete"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0dlbmVyaWNUb29scyIsInBhdGgiOlsyXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Shape Builder"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0dlbmVyaWNUb29scyIsInBhdGgiOlszXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Surface li\u00e9e"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0dlbmVyaWNUb29scyIsInBhdGgiOls0XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Biblioth\u00e8que d'objets"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0dlbmVyaWNUb29scyIsInBhdGgiOls1XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Composant"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0dlbmVyaWNUb29scyIsInBhdGgiOls2XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9f\u00e9rence externe"
+      }
+    ],
+    "BIM_Create2DViews": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0NyZWF0ZTJEVmlld3MiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Dessin 2D"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0NyZWF0ZTJEVmlld3MiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Vue en coupe"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQklNX0NyZWF0ZTJEVmlld3MiLCJwYXRoIjpbMl0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Section Cut"
+      }
+    ],
+    "CAM_EngraveTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0VuZ3JhdmVUb29scyIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Graver"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0VuZ3JhdmVUb29scyIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "\u00c9bavurer"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0VuZ3JhdmVUb29scyIsInBhdGgiOlsyXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Graver en V"
+      }
+    ],
+    "CAM_DressupTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau orthogonal"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Assigner un axe"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOlsyXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Limiter \u00e0 une zone"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOlszXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "D\u00e9gager des angles"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOls0XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Lame rotative"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOls1XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Entr\u00e9e/sortie"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOls2XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Rampe d'entr\u00e9e"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOls3XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Attache"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX0RyZXNzdXBUb29scyIsInBhdGgiOls4XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Correction de la profondeur en Z"
+      }
+    ],
+    "CAM_SimTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX1NpbVRvb2xzIiwicGF0aCI6WzBdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "CAM Simulator"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiQ0FNX1NpbVRvb2xzIiwicGF0aCI6WzFdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Simulateur CAM historique"
+      }
+    ],
+    "Draft_ArcTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJjVG9vbHMiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Arc"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJjVG9vbHMiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Arc par 3 points"
+      }
+    ],
+    "Draft_BezierTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQmV6aWVyVG9vbHMiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Courbe de B\u00e9zier cubique"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQmV6aWVyVG9vbHMiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Courbe de B\u00e9zier"
+      }
+    ],
+    "Draft_ArrayTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau orthogonal"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau polaire"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOlsyXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau circulaire"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOlszXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau selon une courbe"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOls0XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau li\u00e9 selon une courbe"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOls1XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau de points"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOls2XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau li\u00e9 selon des points"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOls3XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau tordu de courbe"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRHJhZnRfQXJyYXlUb29scyIsInBhdGgiOls4XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "R\u00e9seau de lien de courbe tordu"
+      }
+    ],
+    "FEM_CompEmConstraints": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUNvbnN0cmFpbnRzIiwicGF0aCI6WzBdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Condition limite de potentiel \u00e9lectrostatique"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUNvbnN0cmFpbnRzIiwicGF0aCI6WzFdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Condition limite de densit\u00e9 de courant"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUNvbnN0cmFpbnRzIiwicGF0aCI6WzJdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Condition limite de magn\u00e9tisation"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUNvbnN0cmFpbnRzIiwicGF0aCI6WzNdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Densit\u00e9 de charge \u00e9lectrique"
+      }
+    ],
+    "FEM_CompMechEquations": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBNZWNoRXF1YXRpb25zIiwicGF0aCI6WzBdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "\u00c9quation d'\u00e9lasticit\u00e9"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBNZWNoRXF1YXRpb25zIiwicGF0aCI6WzFdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "\u00c9quation de d\u00e9formation"
+      }
+    ],
+    "FEM_CompEmEquations": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUVxdWF0aW9ucyIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "\u00c9quation \u00e9lectrostatique"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUVxdWF0aW9ucyIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "\u00c9quation de force \u00e9lectrique"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUVxdWF0aW9ucyIsInBhdGgiOlsyXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "\u00c9quation magn\u00e9todynamique"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUVxdWF0aW9ucyIsInBhdGgiOlszXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "\u00c9quation magn\u00e9todynamique 2D"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX0NvbXBFbUVxdWF0aW9ucyIsInBhdGgiOls0XSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "\u00c9quation de courant statique"
+      }
+    ],
+    "FEM_PostCreateFunctions": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX1Bvc3RDcmVhdGVGdW5jdGlvbnMiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Plan"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX1Bvc3RDcmVhdGVGdW5jdGlvbnMiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Sph\u00e8re"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX1Bvc3RDcmVhdGVGdW5jdGlvbnMiLCJwYXRoIjpbMl0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Cylindre"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX1Bvc3RDcmVhdGVGdW5jdGlvbnMiLCJwYXRoIjpbM10sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Bo\u00eete"
+      }
+    ],
+    "FEM_PostVisualization": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX1Bvc3RWaXN1YWxpemF0aW9uIiwicGF0aCI6WzBdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Create Lineplot"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX1Bvc3RWaXN1YWxpemF0aW9uIiwicGF0aCI6WzFdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Create Histogram"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiRkVNX1Bvc3RWaXN1YWxpemF0aW9uIiwicGF0aCI6WzJdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Create Table"
+      }
+    ],
+    "PartDesign_CompSketches": [
+      "PartDesign_NewSketch",
+      "Sketcher_MapSketch",
+      "Sketcher_EditSketch"
+    ],
+    "PartDesign_CompPrimitiveAdditive": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Cube additif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Cylindre additif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbMl0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Sph\u00e8re additive"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbM10sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "C\u00f4ne additif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbNF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Ellipso\u00efde additif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbNV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Tore additif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbNl0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Prisme additif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlQWRkaXRpdmUiLCJwYXRoIjpbN10sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Pyramide tronqu\u00e9e additive"
+      }
+    ],
+    "PartDesign_CompPrimitiveSubtractive": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Cube soustractif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Cylindre soustractif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbMl0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Sph\u00e8re soustractive"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbM10sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "C\u00f4ne soustractif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbNF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Ellipso\u00efde soustractif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbNV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Tore soustractif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbNl0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Prisme soustractif"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydERlc2lnbl9Db21wUHJpbWl0aXZlU3VidHJhY3RpdmUiLCJwYXRoIjpbN10sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Pyramide tronqu\u00e9e soustractive"
+      }
+    ],
+    "Part_CompOffset": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wT2Zmc2V0IiwicGF0aCI6WzBdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "D\u00e9caler en 3D"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wT2Zmc2V0IiwicGF0aCI6WzFdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "D\u00e9caler en 2D"
+      }
+    ],
+    "Part_CompCompoundTools": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wQ29tcG91bmRUb29scyIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Cr\u00e9er un compos\u00e9"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wQ29tcG91bmRUb29scyIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Explode Compound"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wQ29tcG91bmRUb29scyIsInBhdGgiOlsyXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Compound Filter"
+      }
+    ],
+    "Part_CompJoinFeatures": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wSm9pbkZlYXR1cmVzIiwicGF0aCI6WzBdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Connect Shapes"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wSm9pbkZlYXR1cmVzIiwicGF0aCI6WzFdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Embed Shapes"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wSm9pbkZlYXR1cmVzIiwicGF0aCI6WzJdLCJzb3VyY2UiOiJjb21tYW5kQWN0aW9ucyJ9",
+        "text": "Cutout Shape"
+      }
+    ],
+    "Part_CompSplitFeatures": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wU3BsaXRGZWF0dXJlcyIsInBhdGgiOlswXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Boolean Fragments"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wU3BsaXRGZWF0dXJlcyIsInBhdGgiOlsxXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Slice Apart"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wU3BsaXRGZWF0dXJlcyIsInBhdGgiOlsyXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Slice to Compound"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiUGFydF9Db21wU3BsaXRGZWF0dXJlcyIsInBhdGgiOlszXSwic291cmNlIjoiY29tbWFuZEFjdGlvbnMifQ",
+        "text": "Boolean XOR"
+      }
+    ],
+    "Sketcher_CompCreateArc": [
+      "Sketcher_CreateArc",
+      "Sketcher_Create3PointArc",
+      "Sketcher_CreateArcOfEllipse",
+      "Sketcher_CreateArcOfHyperbola",
+      "Sketcher_CreateArcOfParabola"
+    ],
+    "Sketcher_CompCreateConic": [
+      "Sketcher_CreateCircle",
+      "Sketcher_Create3PointCircle",
+      "Sketcher_CreateEllipseByCenter",
+      "Sketcher_CreateEllipseBy3Points"
+    ],
+    "Sketcher_CompCreateRectangles": [
+      "Sketcher_CreateRectangle",
+      "Sketcher_CreateRectangle_Center",
+      "Sketcher_CreateOblong"
+    ],
+    "Sketcher_CompCreateRegularPolygon": [
+      "Sketcher_CreateTriangle",
+      "Sketcher_CreateSquare",
+      "Sketcher_CreatePentagon",
+      "Sketcher_CreateHexagon",
+      "Sketcher_CreateHeptagon",
+      "Sketcher_CreateOctagon",
+      "Sketcher_CreateRegularPolygon"
+    ],
+    "Sketcher_CompSlot": [
+      "Sketcher_CreateSlot",
+      "Sketcher_CreateArcSlot"
+    ],
+    "Sketcher_CompCreateBSpline": [
+      "Sketcher_CreateBSpline",
+      "Sketcher_CreatePeriodicBSpline",
+      "Sketcher_CreateBSplineByInterpolation",
+      "Sketcher_CreatePeriodicBSplineByInterpolation"
+    ],
+    "Sketcher_CompDimensionTools": [
+      "Sketcher_Dimension",
+      "Sketcher_ConstrainDistanceX",
+      "Sketcher_ConstrainDistanceY",
+      "Sketcher_ConstrainDistance",
+      "Sketcher_ConstrainRadiam",
+      "Sketcher_ConstrainRadius",
+      "Sketcher_ConstrainDiameter",
+      "Sketcher_ConstrainAngle",
+      "Sketcher_ConstrainLock"
+    ],
+    "Sketcher_CompHorVer": [
+      "Sketcher_ConstrainHorVer",
+      "Sketcher_ConstrainHorizontal",
+      "Sketcher_ConstrainVertical"
+    ],
+    "Sketcher_CompToggleConstraints": [
+      "Sketcher_ToggleDrivingConstraint",
+      "Sketcher_ToggleActiveConstraint"
+    ],
+    "Sketcher_CompCreateFillets": [
+      "Sketcher_CreateFillet",
+      "Sketcher_CreateChamfer"
+    ],
+    "Sketcher_CompCurveEdition": [
+      "Sketcher_Trimming",
+      "Sketcher_Split",
+      "Sketcher_Extend"
+    ],
+    "Sketcher_CompExternal": [
+      "Sketcher_Projection",
+      "Sketcher_Intersection"
+    ],
+    "Sketcher_CompModifyKnotMultiplicity": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiU2tldGNoZXJfQ29tcE1vZGlmeUtub3RNdWx0aXBsaWNpdHkiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Augmenter la multiplicit\u00e9 d'un n\u0153ud"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiU2tldGNoZXJfQ29tcE1vZGlmeUtub3RNdWx0aXBsaWNpdHkiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Diminuer la multiplicit\u00e9 d'un n\u0153ud"
+      }
+    ],
+    "Sketcher_CompBSplineShowHideGeometryInformation": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiU2tldGNoZXJfQ29tcEJTcGxpbmVTaG93SGlkZUdlb21ldHJ5SW5mb3JtYXRpb24iLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Afficher/masquer le degr\u00e9 des B-splines"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiU2tldGNoZXJfQ29tcEJTcGxpbmVTaG93SGlkZUdlb21ldHJ5SW5mb3JtYXRpb24iLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Afficher/masquer le polygone de contr\u00f4le des B-splines"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiU2tldGNoZXJfQ29tcEJTcGxpbmVTaG93SGlkZUdlb21ldHJ5SW5mb3JtYXRpb24iLCJwYXRoIjpbMl0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Afficher/masquer le peigne de courbure des B-splines"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiU2tldGNoZXJfQ29tcEJTcGxpbmVTaG93SGlkZUdlb21ldHJ5SW5mb3JtYXRpb24iLCJwYXRoIjpbM10sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Afficher/masquer la multiplicit\u00e9 des n\u0153uds des B-splines"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiU2tldGNoZXJfQ29tcEJTcGxpbmVTaG93SGlkZUdlb21ldHJ5SW5mb3JtYXRpb24iLCJwYXRoIjpbNF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Afficher/masquer le poids des points de contr\u00f4le des B-splines"
+      }
+    ],
+    "TechDraw_SectionGroup": [
+      "TechDraw_SectionView",
+      "TechDraw_ComplexSection"
+    ],
+    "TechDraw_StackGroup": [
+      "TechDraw_StackTop",
+      "TechDraw_StackBottom",
+      "TechDraw_StackUp",
+      "TechDraw_StackDown"
+    ],
+    "TechDraw_ExtensionExtendShortenLineGroup": [
+      "TechDraw_ExtensionExtendLine",
+      "TechDraw_ExtensionShortenLine"
+    ],
+    "TechDraw_ExtensionCircleCenterLinesGroup": [
+      "TechDraw_ExtensionCircleCenterLines",
+      "TechDraw_ExtensionHoleCircle"
+    ],
+    "TechDraw_ExtensionThreadsGroup": [
+      "TechDraw_ExtensionThreadHoleSide",
+      "TechDraw_ExtensionThreadHoleBottom",
+      "TechDraw_ExtensionThreadBoltSide",
+      "TechDraw_ExtensionThreadBoltBottom"
+    ],
+    "TechDraw_CommandVertexCreationGroup": [
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiVGVjaERyYXdfQ29tbWFuZFZlcnRleENyZWF0aW9uR3JvdXAiLCJwYXRoIjpbMF0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Intersections cosm\u00e9tiques de lignes"
+      },
+      {
+        "id": "__commandtab_action__:eyJjb21tYW5kIjoiVGVjaERyYXdfQ29tbWFuZFZlcnRleENyZWF0aW9uR3JvdXAiLCJwYXRoIjpbMV0sInNvdXJjZSI6ImNvbW1hbmRBY3Rpb25zIn0",
+        "text": "Offset Vertex"
+      }
+    ],
+    "TechDraw_ExtensionDrawCirclesGroup": [
+      "TechDraw_CosmeticCircle",
+      "TechDraw_ExtensionDrawCosmCircle",
+      "TechDraw_ExtensionDrawCosmCircle3Points",
+      "TechDraw_ExtensionDrawCosmArc"
+    ],
+    "TechDraw_ExtensionLinePPGroup": [
+      "TechDraw_ExtensionLineParallel",
+      "TechDraw_ExtensionLinePerpendicular"
+    ],
+    "TechDraw_CosmeticVertexGroup": [
+      "TechDraw_CosmeticVertex",
+      "TechDraw_Midpoints",
+      "TechDraw_Quadrants"
+    ],
+    "TechDraw_CenterLineGroup": [
+      "TechDraw_FaceCenterLine",
+      "TechDraw_2LineCenterLine",
+      "TechDraw_2PointCenterLine"
+    ],
+    "TechDraw_CompDimensionTools": [
+      "TechDraw_Dimension",
+      "TechDraw_LengthDimension",
+      "TechDraw_HorizontalDimension",
+      "TechDraw_VerticalDimension",
+      "TechDraw_RadiusDimension",
+      "TechDraw_DiameterDimension",
+      "TechDraw_AngleDimension",
+      "TechDraw_3PtAngleDimension",
+      "TechDraw_AreaDimension",
+      "TechDraw_ExtensionCreateLengthArc",
+      "TechDraw_HorizontalExtentDimension",
+      "TechDraw_VerticalExtentDimension",
+      "TechDraw_ExtensionCreateHorizChainDimension",
+      "TechDraw_ExtensionCreateVertChainDimension",
+      "TechDraw_ExtensionCreateObliqueChainDimension",
+      "TechDraw_ExtensionCreateHorizCoordDimension",
+      "TechDraw_ExtensionCreateVertCoordDimension",
+      "TechDraw_ExtensionCreateObliqueCoordDimension",
+      "TechDraw_ExtensionCreateHorizChamferDimension",
+      "TechDraw_ExtensionCreateVertChamferDimension"
+    ],
+    "TechDraw_ExtensionInsertPrefixGroup": [
+      "TechDraw_ExtensionInsertDiameter",
+      "TechDraw_ExtensionInsertSquare",
+      "TechDraw_ExtensionInsertRepetition",
+      "TechDraw_ExtensionRemovePrefixChar"
+    ],
+    "TechDraw_ExtensionIncreaseDecreaseGroup": [
+      "TechDraw_ExtensionIncreaseDecimal",
+      "TechDraw_ExtensionDecreaseDecimal"
+    ]
+  }
+}

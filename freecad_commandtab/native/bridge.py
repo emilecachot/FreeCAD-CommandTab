@@ -75,6 +75,7 @@ _BOOTSTRAP_PAYLOAD_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str,
 _WORKBENCH_BOOTSTRAP_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, str], str] = {}
 _WORKBENCH_BOOTSTRAP_STATE_CACHE: dict[str, dict[str, object]] = {}
 _VARIANT_MENU_CACHE_MEMORY: dict[str, object] = {}
+_STATIC_COMMAND_VARIANT_MENU_CACHE: dict[str, list[object]] | None = None
 _WORKBENCH_PRELOAD_IN_PROGRESS = False
 _WORKBENCH_PRELOAD_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PRELOAD_WORKBENCHES", "0") or "0"
@@ -146,6 +147,78 @@ _CACHE_LOCALE_SIGNATURE = ""
 _LOADED_STRUCTURE_LANGUAGE = ""
 _MACOS_FRENCH_TS_TRANSLATIONS: dict[str, dict[str, str]] | None = None
 _MACOS_FRENCH_TS_CONTEXT_MESSAGES: dict[str, list[tuple[str, str]]] | None = None
+_STATIC_COMMAND_VARIANT_MENUS: dict[str, tuple[str, ...]] = {
+    "Sketcher_CompCreateArc": (
+        "Sketcher_CreateArc",
+        "Sketcher_Create3PointArc",
+        "Sketcher_CreateArcOfEllipse",
+        "Sketcher_CreateArcOfHyperbola",
+        "Sketcher_CreateArcOfParabola",
+    ),
+    "Sketcher_CompCreateConic": (
+        "Sketcher_CreateCircle",
+        "Sketcher_Create3PointCircle",
+        "Sketcher_CreateEllipseByCenter",
+        "Sketcher_CreateEllipseBy3Points",
+    ),
+    "Sketcher_CompCreateRectangles": (
+        "Sketcher_CreateRectangle",
+        "Sketcher_CreateRectangle_Center",
+        "Sketcher_CreateOblong",
+    ),
+    "Sketcher_CompCreateRegularPolygon": (
+        "Sketcher_CreateTriangle",
+        "Sketcher_CreateSquare",
+        "Sketcher_CreatePentagon",
+        "Sketcher_CreateHexagon",
+        "Sketcher_CreateHeptagon",
+        "Sketcher_CreateOctagon",
+        "Sketcher_CreateRegularPolygon",
+    ),
+    "Sketcher_CompSlot": (
+        "Sketcher_CreateSlot",
+        "Sketcher_CreateArcSlot",
+    ),
+    "Sketcher_CompCreateBSpline": (
+        "Sketcher_CreateBSpline",
+        "Sketcher_CreatePeriodicBSpline",
+        "Sketcher_CreateBSplineByInterpolation",
+        "Sketcher_CreatePeriodicBSplineByInterpolation",
+    ),
+    "Sketcher_CompDimensionTools": (
+        "Sketcher_Dimension",
+        "Sketcher_ConstrainDistanceX",
+        "Sketcher_ConstrainDistanceY",
+        "Sketcher_ConstrainDistance",
+        "Sketcher_ConstrainRadiam",
+        "Sketcher_ConstrainRadius",
+        "Sketcher_ConstrainDiameter",
+        "Sketcher_ConstrainAngle",
+        "Sketcher_ConstrainLock",
+    ),
+    "Sketcher_CompHorVer": (
+        "Sketcher_ConstrainHorVer",
+        "Sketcher_ConstrainHorizontal",
+        "Sketcher_ConstrainVertical",
+    ),
+    "Sketcher_CompToggleConstraints": (
+        "Sketcher_ToggleDrivingConstraint",
+        "Sketcher_ToggleActiveConstraint",
+    ),
+    "Sketcher_CompCreateFillets": (
+        "Sketcher_CreateFillet",
+        "Sketcher_CreateChamfer",
+    ),
+    "Sketcher_CompCurveEdition": (
+        "Sketcher_Trimming",
+        "Sketcher_Split",
+        "Sketcher_Extend",
+    ),
+    "Sketcher_CompExternal": (
+        "Sketcher_Projection",
+        "Sketcher_Intersection",
+    ),
+}
 
 
 def _set_native_runtime_diagnostics(stage: str = "", error: str | None = None) -> None:
@@ -3242,6 +3315,134 @@ def _command_subaction_trigger_id(
     return _encode_command_action_trigger(parent_command_name, path, source)
 
 
+def _load_static_command_variant_menu_specs() -> dict[str, list[object]]:
+    global _STATIC_COMMAND_VARIANT_MENU_CACHE
+
+    if _STATIC_COMMAND_VARIANT_MENU_CACHE is not None:
+        return copy.deepcopy(_STATIC_COMMAND_VARIANT_MENU_CACHE)
+
+    specs: dict[str, list[object]] = {
+        str(parent): [str(child) for child in children]
+        for parent, children in _STATIC_COMMAND_VARIANT_MENUS.items()
+    }
+    source_path = Path(paths.addon_path("freecad_commandtab", "native", "static_variant_menus.json"))
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except Exception:
+        payload = None
+    if isinstance(payload, dict):
+        commands = _coerce_dict(payload.get("commands"))
+        for parent_command_name, children in commands.items():
+            parent_command_name = str(parent_command_name or "").strip()
+            if parent_command_name == "" or isinstance(children, list) is False:
+                continue
+            clean_children = []
+            for child in children:
+                if isinstance(child, dict):
+                    child_id = str(child.get("id") or "").strip()
+                    if child_id == "":
+                        continue
+                    clean_child = {"id": child_id}
+                    child_text = str(child.get("text") or "").strip()
+                    if child_text != "":
+                        clean_child["text"] = child_text
+                    clean_children.append(clean_child)
+                    continue
+                child_id = str(child or "").strip()
+                if child_id != "":
+                    clean_children.append(child_id)
+            if clean_children:
+                specs[parent_command_name] = clean_children
+
+    _STATIC_COMMAND_VARIANT_MENU_CACHE = copy.deepcopy(specs)
+    return specs
+
+
+def _build_static_variant_menu_entry(
+    child_spec,
+    command_data: dict,
+) -> dict | None:
+    child_text = ""
+    if isinstance(child_spec, dict):
+        child_command_name = str(child_spec.get("id") or "").strip()
+        child_text = str(child_spec.get("text") or "").strip()
+    else:
+        child_command_name = str(child_spec or "").strip()
+    if child_command_name == "":
+        return None
+
+    command_info = _command_info(child_command_name)
+    text = child_text or _resolved_command_display_text(child_command_name, {}, command_info)
+    if text == "":
+        text = _humanized_command_id(child_command_name)
+
+    icon_hint = str(command_info.get("pixmap") or "")
+    icon_path = ""
+    if not child_command_name.startswith("__commandtab_action__:"):
+        icon_path = _export_icon(child_command_name, icon_hint, persistent=True)
+    entry = {
+        "type": "command",
+        "id": child_command_name,
+        "text": text,
+        "size": "small",
+        "textVisible": True,
+        "iconPath": icon_path,
+        "sourceWorkbenchId": str(command_data.get("sourceWorkbenchId") or ""),
+        "sourceToolbarTitle": str(command_data.get("sourceToolbarTitle") or ""),
+    }
+    shortcut = "" if child_command_name.startswith("__commandtab_action__:") else _command_shortcut(child_command_name)
+    if shortcut != "":
+        entry["shortcut"] = shortcut
+    return entry
+
+
+def _static_variant_menu_entries(command_name: str, command_data: dict) -> list[dict]:
+    command_name = str(command_name or "").strip()
+    child_specs = _load_static_command_variant_menu_specs().get(command_name, [])
+    if not child_specs:
+        return []
+
+    entries = []
+    seen_ids = {command_name}
+    for child_spec in child_specs:
+        child_id = (
+            str(child_spec.get("id") or "").strip()
+            if isinstance(child_spec, dict)
+            else str(child_spec or "").strip()
+        )
+        if child_id == "" or child_id in seen_ids:
+            continue
+        entry = _build_static_variant_menu_entry(child_spec, command_data)
+        if entry is None:
+            continue
+        seen_ids.add(child_id)
+        entries.append(entry)
+    return entries
+
+
+def _cached_or_static_variant_menu_entries(command_name: str, command_data: dict) -> list[dict]:
+    entries = _cached_variant_menu_entries(command_name)
+    static_entries = _static_variant_menu_entries(command_name, command_data)
+    if not entries:
+        return static_entries
+    if not static_entries:
+        return entries
+
+    seen_ids = {
+        str(entry.get("id") or "").strip()
+        for entry in entries
+        if isinstance(entry, dict)
+    }
+    merged_entries = list(entries)
+    for static_entry in static_entries:
+        static_id = str(static_entry.get("id") or "").strip()
+        if static_id == "" or static_id in seen_ids:
+            continue
+        merged_entries.append(static_entry)
+        seen_ids.add(static_id)
+    return merged_entries
+
+
 def _build_command_subaction_entry(
     parent_command_name: str,
     action,
@@ -3333,9 +3534,9 @@ def _command_subaction_entries(command_name: str, command_data: dict) -> list[di
         command = Gui.Command.get(command_name)
         actions = list(command.getAction()) if command is not None else []
     except Exception:
-        return _cached_variant_menu_entries(command_name)
+        return _cached_or_static_variant_menu_entries(command_name, command_data)
     if len(actions) == 0:
-        return _cached_variant_menu_entries(command_name)
+        return _cached_or_static_variant_menu_entries(command_name, command_data)
 
     entries: list[dict] = []
     seen_ids: set[str] = {command_name}
@@ -3366,7 +3567,7 @@ def _command_subaction_entries(command_name: str, command_data: dict) -> list[di
     if entries:
         _write_variant_menu_cache_entry(command_name, entries)
         return entries
-    return _cached_variant_menu_entries(command_name)
+    return _cached_or_static_variant_menu_entries(command_name, command_data)
 
 
 def _command_subaction_signature(menu_commands: list[dict]) -> tuple[tuple[str, str], ...]:

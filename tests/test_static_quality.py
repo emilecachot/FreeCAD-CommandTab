@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 
 from freecad_commandtab import paths
@@ -155,6 +156,11 @@ def test_native_dropdown_commands_use_split_button_behavior() -> None:
     assert "def _persistent_variant_menu_cache_path() -> Path:" in bridge_text
     assert "def _cached_variant_menu_entries(command_name: str) -> list[dict]:" in bridge_text
     assert "_write_variant_menu_cache_entry(command_name, entries)" in bridge_text
+    assert "static_variant_menus.json" in bridge_text
+    assert "def _load_static_command_variant_menu_specs() -> dict[str, list[object]]:" in bridge_text
+    assert '"Sketcher_CompCreateRectangles"' in bridge_text
+    assert '"Sketcher_CreateRectangle_Center"' in bridge_text
+    assert "_cached_or_static_variant_menu_entries(command_name, command_data)" in bridge_text
     assert "dropdownHotZoneRect().contains(event->pos())" in widget_text
     assert 'setProperty("commandtabHasMenuCommands", !m_menuCommands.isEmpty())' in widget_text
     assert 'setProperty("commandtabMenuCommandCount", m_menuCommands.size())' in widget_text
@@ -278,13 +284,19 @@ def test_startup_variant_menu_repair_is_enabled() -> None:
     bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
         encoding="utf-8"
     )
+    static_variant_menus = json.loads(
+        (ROOT / "freecad_commandtab" / "native" / "static_variant_menus.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert "_NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 2" in bridge_text
     assert "_NATIVE_VARIANT_MENU_CACHE_VERSION = 1" in bridge_text
     assert "_NATIVE_METADATA_CACHE_VERSION = 36" in bridge_text
     assert "def _payload_has_command_variant_menus(payload: str) -> bool:" in bridge_text
     assert 'command_type == "command"' in bridge_text
     assert "CommandTabVariantMenus.json" in bridge_text
-    assert "return _cached_variant_menu_entries(command_name)" in bridge_text
+    assert "return _cached_or_static_variant_menu_entries(command_name, command_data)" in bridge_text
+    assert "def _static_variant_menu_entries(command_name: str, command_data: dict) -> list[dict]:" in bridge_text
     assert "def _schedule_variant_menu_repair_if_needed(self, payload: str) -> None:" in bridge_text
     assert "def _run_variant_menu_repair(self) -> None:" in bridge_text
     assert "self._schedule_variant_menu_repair_if_needed(payload)" in bridge_text
@@ -294,3 +306,8 @@ def test_startup_variant_menu_repair_is_enabled() -> None:
     assert "self._last_bootstrap_state = {}" in bridge_text
     assert "_NATIVE_VARIANT_MENU_REPAIR_MAX_ATTEMPTS" in bridge_text
     assert "self._variant_menu_repair_attempt_count += 1" in bridge_text
+    assert static_variant_menus["cacheVersion"] == 1
+    assert "Sketcher_CompCreateRectangles" in static_variant_menus["commands"]
+    assert "Sketcher_CreateRectangle_Center" in static_variant_menus["commands"]["Sketcher_CompCreateRectangles"]
+    assert "TechDraw_CompDimensionTools" in static_variant_menus["commands"]
+    assert "PartDesign_CompPrimitiveAdditive" in static_variant_menus["commands"]
