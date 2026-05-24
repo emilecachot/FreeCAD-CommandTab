@@ -157,6 +157,19 @@ def _coerce_list(value) -> list:
     return list(value) if isinstance(value, list) else []
 
 
+def _is_separator_command_id(command_name: str) -> bool:
+    normalized = str(command_name or "").strip().lower()
+    if normalized == "":
+        return False
+    if normalized in {"0", "|", "-", "--", "---", "separator"}:
+        return True
+    return (
+        normalized.startswith("separator_")
+        or normalized.endswith("_separator")
+        or "_separator_" in normalized
+    )
+
+
 def _bounded_cache_set(cache: dict, key, value, max_entries: int = _PAYLOAD_CACHE_MAX_ENTRIES) -> None:
     cache[key] = value
     if len(cache) <= max_entries:
@@ -4445,7 +4458,7 @@ def _run_grid_toggle_command() -> bool:
 
 
 def _build_command_entry(command_name: str, command_data: dict) -> dict:
-    if "_separator_" in command_name or command_name.endswith("_separator"):
+    if _is_separator_command_id(command_name):
         return {"type": "separator", "id": command_name}
 
     command_data = _coerce_dict(command_data or {})
@@ -4496,7 +4509,7 @@ def _enrich_native_payload_menu_commands(payload: dict) -> dict:
         if isinstance(command, dict) is False:
             return
         command_id = str(command.get("id") or "").strip()
-        if command_id == "" or "_separator_" in command_id or command_id.endswith("_separator"):
+        if command_id == "" or _is_separator_command_id(command_id):
             return
         existing_menu_commands = _coerce_list(command.get("menuCommands", []))
         if len(existing_menu_commands) == 0:
@@ -4559,7 +4572,7 @@ def _build_panel_command_entries(
         command_name = str(command_name or "")
         if command_name == "":
             continue
-        if "_separator_" not in command_name and not command_name.endswith("_separator"):
+        if _is_separator_command_id(command_name) is False:
             if command_name in seen_command_names:
                 continue
             seen_command_names.add(command_name)
@@ -5619,7 +5632,7 @@ def _ensure_native_metadata_cache(
             include_quick_access=include_quick_access,
         ):
             command_name = str(command_name or "").strip()
-            if command_name == "" or "_separator_" in command_name or command_name.endswith("_separator"):
+            if command_name == "" or _is_separator_command_id(command_name):
                 continue
             target_command_ids.add(command_name)
 
@@ -5842,7 +5855,7 @@ def _ensure_native_metadata_cache(
             workbench_names=workbenches_to_build,
             include_quick_access=quick_access_to_build,
         ):
-            if "_separator_" in command_name or command_name.endswith("_separator"):
+            if _is_separator_command_id(command_name):
                 continue
             command_payload = commands_payload.get(command_name)
             if (

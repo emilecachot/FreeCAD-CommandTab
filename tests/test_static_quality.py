@@ -243,3 +243,13 @@ def test_loaded_workbench_activation_prefers_set_active_without_upsert() -> None
     )
     assert "if workbench_name in self._loaded_workbenches:" in bridge_text
     assert "if self._set_active_workbench(workbench_name):" in bridge_text
+
+
+def test_separator_normalization_uses_shared_helper() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def _is_separator_command_id(command_name: str) -> bool:" in bridge_text
+    assert 'normalized.startswith("separator_")' in bridge_text
+    assert 'normalized in {"0", "|", "-", "--", "---", "separator"}' in bridge_text
+    assert "if _is_separator_command_id(command_name):" in bridge_text
