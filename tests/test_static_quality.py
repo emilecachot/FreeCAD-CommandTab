@@ -280,3 +280,8 @@ def test_startup_variant_menu_repair_is_enabled() -> None:
     assert "def _schedule_variant_menu_repair_if_needed(self, payload: str) -> None:" in bridge_text
     assert "def _run_variant_menu_repair(self) -> None:" in bridge_text
     assert "self._schedule_variant_menu_repair_if_needed(payload)" in bridge_text
+    assert "def _clear_runtime_payload_caches() -> None:" in bridge_text
+    assert "_clear_runtime_payload_caches()" in bridge_text
+    assert "if _is_cpp_bootstrap_pipeline_enabled() is True:" in bridge_text
+    assert "_build_native_model_payload_safe(" in bridge_text
+    assert "self._last_bootstrap_state = {}" in bridge_text

@@ -186,6 +186,14 @@ def _payload_has_menu_commands(payload: str) -> bool:
     return False
 
 
+def _clear_runtime_payload_caches() -> None:
+    _MODEL_PAYLOAD_CACHE.clear()
+    _BOOTSTRAP_PAYLOAD_CACHE.clear()
+    _WORKBENCH_PAYLOAD_CACHE.clear()
+    _WORKBENCH_BOOTSTRAP_CACHE.clear()
+    _WORKBENCH_BOOTSTRAP_STATE_CACHE.clear()
+
+
 def _is_separator_command_id(command_name: str) -> bool:
     normalized = str(command_name or "").strip().lower()
     if normalized == "":
@@ -6746,6 +6754,22 @@ class NativeCommandTabController:
                 return
             self._variant_menu_repair_attempted = True
             try:
+                _clear_runtime_payload_caches()
+                if _is_cpp_bootstrap_pipeline_enabled() is True:
+                    active_workbench, payload, loaded_workbenches, full_model_loaded = (
+                        _build_native_model_payload_safe(
+                            include_all_panels=_is_native_startup_preload_all_panels_enabled()
+                        )
+                    )
+                    if _payload_has_menu_commands(payload) is True:
+                        _runtime_model_path().write_text(payload, encoding="utf-8")
+                        self._last_model_payload = payload
+                        self._last_active_workbench = active_workbench
+                        self._loaded_workbenches = set(loaded_workbenches)
+                        self._full_model_loaded = full_model_loaded
+                        self._last_bootstrap_state = {}
+                        self._reload_model_payload(payload)
+                        return
                 self.refresh(
                     force=True,
                     include_all_panels=_is_native_startup_preload_all_panels_enabled(),
