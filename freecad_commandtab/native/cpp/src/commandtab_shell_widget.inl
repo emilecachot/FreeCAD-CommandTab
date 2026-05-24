@@ -454,6 +454,9 @@ public:
         m_workbenchPagesBuilt.clear();
         m_workbenchPagesDirty.clear();
         m_pageBuildStates.clear();
+        m_fullPagePreloadScheduled = false;
+        m_fullPagePreloadCursor = 0;
+        m_fullPagePreloadCompleted = false;
         m_recentPanelCommandHistory.clear();
         m_pendingPanelPrimaryRefresh.clear();
 
@@ -505,6 +508,7 @@ public:
             m_tabBar->setCurrentIndex(activeIndex);
             m_stack->setCurrentIndex(activeIndex);
             scheduleBackgroundPageWarmup();
+            scheduleFullPagePreload();
         }
         applyTabTextColors();
         updateTabNavigationButtons();
@@ -683,6 +687,8 @@ public:
                 m_stack->setCurrentIndex(currentIndex);
             }
         }
+        m_fullPagePreloadCompleted = false;
+        scheduleFullPagePreload();
 
         updateGeometry();
         if (m_contentChangedHandler) {
@@ -753,6 +759,7 @@ public:
             m_customizationDialog->setModel(m_model);
         }
         scheduleBackgroundPageWarmup();
+        scheduleFullPagePreload();
         scheduleCommandIconRefresh(30, 2);
         return true;
     }
@@ -2459,6 +2466,7 @@ QWidget#CommandTabWorkbenchViewport {
         auto& pageState = m_pageBuildStates[index];
         pageState = PageBuildState();
         m_workbenchPagesBuilt[index] = false;
+        m_fullPagePreloadCompleted = false;
 
         auto* previousWidget = m_stack->widget(index);
         auto* placeholder = new QWidget(m_stack);
@@ -2762,6 +2770,46 @@ QWidget#CommandTabWorkbenchViewport {
             scheduleBackgroundPageWarmup();
             return;
         }
+    }
+
+    void scheduleFullPagePreload()
+    {
+        if (m_fullPagePreloadCompleted || m_workbenchEntries.size() <= 1) {
+            return;
+        }
+        if (m_fullPagePreloadScheduled) {
+            return;
+        }
+        m_fullPagePreloadScheduled = true;
+        QTimer::singleShot(0, this, [this]() {
+            m_fullPagePreloadScheduled = false;
+            continueFullPagePreload();
+        });
+    }
+
+    void continueFullPagePreload()
+    {
+        const int count = static_cast<int>(m_workbenchEntries.size());
+        if (count <= 1) {
+            m_fullPagePreloadCompleted = true;
+            return;
+        }
+
+        for (int attempt = 0; attempt < count; ++attempt) {
+            const int index = (m_fullPagePreloadCursor + attempt) % count;
+            if (index < 0 || index >= m_workbenchPagesBuilt.size()) {
+                continue;
+            }
+            if (m_workbenchPagesBuilt.at(index)) {
+                continue;
+            }
+            m_fullPagePreloadCursor = index + 1;
+            ensureWorkbenchPage(index, 100000, false);
+            scheduleFullPagePreload();
+            return;
+        }
+
+        m_fullPagePreloadCompleted = true;
     }
 
     QString panelUsageKey(const QString& workbenchId, const QString& panelId) const
@@ -4344,6 +4392,9 @@ private:
     bool m_loadingModel = false;
     bool m_backgroundPageWarmupScheduled = false;
     int m_backgroundWarmupCursor = 0;
+    bool m_fullPagePreloadScheduled = false;
+    int m_fullPagePreloadCursor = 0;
+    bool m_fullPagePreloadCompleted = false;
     QToolButton* m_gridToggleButton = nullptr;
     QToolButton* m_collapseButton = nullptr;
     QPropertyAnimation* m_stackAnimation = nullptr;

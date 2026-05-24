@@ -235,3 +235,11 @@ def test_native_runtime_and_bootstrap_payload_cache_are_user_scoped() -> None:
     assert 'Path(paths.user_cache_path("native-runtime"))' in bridge_text
     assert "def _runtime_bootstrap_payload_cache_path()" in bridge_text
     assert '"bootstrap-payload-cache.json"' in bridge_text
+
+
+def test_loaded_workbench_activation_prefers_set_active_without_upsert() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    assert "if workbench_name in self._loaded_workbenches:" in bridge_text
+    assert "if self._set_active_workbench(workbench_name):" in bridge_text

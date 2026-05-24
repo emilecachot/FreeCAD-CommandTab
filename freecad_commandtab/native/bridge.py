@@ -7156,10 +7156,12 @@ class NativeCommandTabController:
                     alreadyLoaded=workbench_name in self._loaded_workbenches,
                 )
                 if workbench_name in self._loaded_workbenches:
-                    if self._upsert_workbench(workbench_name, activate=True):
+                    # Workbench already loaded in native shell: switch active tab
+                    # directly to avoid rebuilding page content on each click/switch.
+                    if self._set_active_workbench(workbench_name):
                         self._schedule_warmup()
                         return
-                    if self._set_active_workbench(workbench_name):
+                    if self._upsert_workbench(workbench_name, activate=True):
                         return
                 if self._upsert_workbench(workbench_name, activate=True) is False:
                     self.refresh(
