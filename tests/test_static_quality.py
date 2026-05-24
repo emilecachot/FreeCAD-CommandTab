@@ -226,3 +226,12 @@ def test_native_metadata_cache_tracks_freecad_environment_signature() -> None:
     assert "App.Version()" in bridge_text
     assert "_available_workbenches().keys()" in bridge_text
     assert '"environmentSignature"' in bridge_text
+
+
+def test_native_runtime_and_bootstrap_payload_cache_are_user_scoped() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'Path(paths.user_cache_path("native-runtime"))' in bridge_text
+    assert "def _runtime_bootstrap_payload_cache_path()" in bridge_text
+    assert '"bootstrap-payload-cache.json"' in bridge_text

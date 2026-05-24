@@ -10,7 +10,6 @@ import os
 import platform
 import re
 import shutil
-import tempfile
 import time
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -128,6 +127,7 @@ _NATIVE_PERSISTENT_METADATA_BOOTSTRAP_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PERSISTENT_METADATA_BOOTSTRAP", "0") or "0"
 ).strip().lower() in {"1", "true", "yes", "on"}
 _NATIVE_METADATA_CACHE_VERSION = 35
+_NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 1
 _AVAILABLE_WORKBENCHES_CACHE_TTL_S = 0.45
 _MAIN_WINDOW_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/MainWindow")
 _COMMANDTAB_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab")
@@ -823,7 +823,7 @@ def enable_native_ui_hide_controller(enabled: bool = True) -> bool:
 
 
 def _runtime_root() -> Path:
-    root = Path(tempfile.gettempdir()) / "freecad-commandtab-native"
+    root = Path(paths.user_cache_path("native-runtime"))
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -836,6 +836,10 @@ def _runtime_icons_dir() -> Path:
 
 def _runtime_theme_stamp_path() -> Path:
     return _runtime_root() / "theme-signature.txt"
+
+
+def _runtime_bootstrap_payload_cache_path() -> Path:
+    return _runtime_root() / "bootstrap-payload-cache.json"
 
 
 def _ensure_runtime_icon_cache_matches_theme() -> None:
@@ -6083,6 +6087,79 @@ def _native_build_workbench_json(
     return payload
 
 
+def _bootstrap_payload_cache_key(
+    structure_key: tuple[str, int, int],
+    theme_signature: tuple[str, str],
+    active_workbench: str,
+    include_all_panels: bool,
+    settings_signature: str,
+) -> dict[str, object]:
+    return {
+        "cacheVersion": _NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION,
+        "metadataCacheVersion": _NATIVE_METADATA_CACHE_VERSION,
+        "pipeline": "cpp-bootstrap" if _is_cpp_bootstrap_pipeline_enabled() else "python-model",
+        "structureKey": [structure_key[0], structure_key[1], structure_key[2]],
+        "themeSignature": [theme_signature[0], theme_signature[1]],
+        "environmentSignature": _native_metadata_environment_signature(),
+        "activeWorkbenchId": str(active_workbench or ""),
+        "includeAllPanels": bool(include_all_panels),
+        "settingsSignature": str(settings_signature or ""),
+    }
+
+
+def _load_cached_bootstrap_payload(expected_key: dict[str, object]) -> tuple[str, set[str]] | None:
+    cache_path = _runtime_bootstrap_payload_cache_path()
+    if cache_path.exists() is False:
+        return None
+
+    try:
+        cached_payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if isinstance(cached_payload, dict) is False:
+        return None
+
+    if _coerce_dict(cached_payload.get("key")) != _coerce_dict(expected_key):
+        return None
+
+    payload = str(cached_payload.get("payload") or "")
+    if payload == "":
+        return None
+
+    loaded_workbenches = {
+        str(item)
+        for item in _coerce_list(cached_payload.get("loadedWorkbenches", []))
+        if str(item).strip() != ""
+    }
+    return payload, loaded_workbenches
+
+
+def _write_cached_bootstrap_payload(
+    cache_key: dict[str, object],
+    payload: str,
+    loaded_workbenches: set[str],
+) -> None:
+    if str(payload or "").strip() == "":
+        return
+    cache_path = _runtime_bootstrap_payload_cache_path()
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    payload_data = {
+        "key": dict(cache_key),
+        "payload": str(payload),
+        "loadedWorkbenches": sorted(
+            str(item)
+            for item in loaded_workbenches
+            if str(item).strip() != ""
+        ),
+    }
+    tmp_path = cache_path.with_suffix(".tmp")
+    tmp_path.write_text(
+        json.dumps(payload_data, ensure_ascii=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    tmp_path.replace(cache_path)
+
+
 def _build_native_bootstrap_payload(
     include_all_panels: bool = False,
 ) -> tuple[str, str, set[str]]:
@@ -6101,19 +6178,39 @@ def _build_native_bootstrap_payload(
             include_all_panels,
             settings_signature,
         )
-        cached_payload = _BOOTSTRAP_PAYLOAD_CACHE.get(cache_key)
-        if cached_payload is not None:
-            loaded_workbenches = set()
+        persistent_cache_key = _bootstrap_payload_cache_key(
+            structure_key,
+            theme_signature,
+            active_workbench,
+            include_all_panels,
+            settings_signature,
+        )
+
+        def _loaded_workbenches_for_current_scope() -> set[str]:
+            loaded: set[str] = set()
             if include_all_panels is True:
                 for workbench_name, _workbench_data in structure.get("workbenches", {}).items():
                     workbench_name = str(workbench_name or "")
                     if _is_available_workbench(workbench_name) is False:
                         continue
                     if _has_native_panels(structure, workbench_name):
-                        loaded_workbenches.add(workbench_name)
+                        loaded.add(workbench_name)
             elif active_workbench != "" and _is_available_workbench(active_workbench):
-                loaded_workbenches.add(active_workbench)
+                loaded.add(active_workbench)
+            return loaded
+
+        cached_payload = _BOOTSTRAP_PAYLOAD_CACHE.get(cache_key)
+        if cached_payload is not None:
+            loaded_workbenches = _loaded_workbenches_for_current_scope()
             return active_workbench, cached_payload, loaded_workbenches
+
+        cached_payload_from_disk = _load_cached_bootstrap_payload(persistent_cache_key)
+        if cached_payload_from_disk is not None:
+            disk_payload, disk_loaded_workbenches = cached_payload_from_disk
+            _bounded_cache_set(_BOOTSTRAP_PAYLOAD_CACHE, cache_key, disk_payload)
+            if len(disk_loaded_workbenches) > 0:
+                return active_workbench, disk_payload, disk_loaded_workbenches
+            return active_workbench, disk_payload, _loaded_workbenches_for_current_scope()
 
         required_workbenches = None
         if include_all_panels is False and active_workbench != "":
@@ -6193,6 +6290,14 @@ def _build_native_bootstrap_payload(
                     loaded_workbenches.add(workbench_name)
         elif active_workbench != "" and _is_available_workbench(active_workbench):
             loaded_workbenches.add(active_workbench)
+        try:
+            _write_cached_bootstrap_payload(
+                persistent_cache_key,
+                payload,
+                loaded_workbenches,
+            )
+        except Exception:
+            pass
         return active_workbench, payload, loaded_workbenches
 
 
