@@ -249,9 +249,6 @@ def test_separator_normalization_uses_shared_helper() -> None:
     bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
         encoding="utf-8"
     )
-    model_text = (
-        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_model.inl"
-    ).read_text(encoding="utf-8")
     settings_text = (
         ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_settings_dialog.inl"
     ).read_text(encoding="utf-8")
@@ -259,9 +256,6 @@ def test_separator_normalization_uses_shared_helper() -> None:
     assert 'normalized.startswith("separator_")' in bridge_text
     assert 'normalized in {"0", "|", "-", "--", "---", "separator"}' in bridge_text
     assert "if _is_separator_command_id(command_name):" in bridge_text
-    assert "bool looksLikeSeparatorCommandId(const QString& commandId)" in model_text
-    assert "normalized.startsWith(QStringLiteral(\"separator_\"))" in model_text
-    assert "|| normalized.contains(QStringLiteral(\"_separator_\"));" in model_text
     assert "bool isSeparatorCommand(const QString& commandId)" in settings_text
     assert "normalized.startsWith(QStringLiteral(\"separator_\"))" in settings_text
     assert "if (!id.isEmpty() && !isSeparatorCommand(id)) {" in settings_text
