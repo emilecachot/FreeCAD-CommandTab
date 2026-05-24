@@ -491,6 +491,75 @@ def _native_theme_signature() -> tuple[str, str]:
     )
 
 
+def _freecad_version_signature() -> str:
+    try:
+        version = App.Version()
+    except Exception:
+        version = ""
+
+    if isinstance(version, (list, tuple)):
+        parts = [str(part).strip() for part in version if str(part).strip() != ""]
+        if parts:
+            return "|".join(parts)
+
+    version_text = str(version or "").strip()
+    if version_text != "":
+        return version_text
+
+    for key in ["ExeVersion", "BuildVersion", "BuildRevision"]:
+        try:
+            value = str(App.ConfigGet(key) or "").strip()
+        except Exception:
+            value = ""
+        if value != "":
+            return f"{key}:{value}"
+    return "unknown"
+
+
+def _freecad_build_signature() -> str:
+    parts: list[str] = []
+    for key in [
+        "BuildRevision",
+        "BuildHash",
+        "BuildVersion",
+        "ExeVersion",
+        "ExeVersionName",
+    ]:
+        try:
+            value = str(App.ConfigGet(key) or "").strip()
+        except Exception:
+            value = ""
+        if value != "":
+            parts.append(f"{key}:{value}")
+    return "|".join(parts)
+
+
+def _native_metadata_environment_signature() -> str:
+    workbench_names = sorted(
+        {
+            str(name).strip()
+            for name in _available_workbenches().keys()
+            if str(name).strip() != ""
+        }
+    )
+    workbench_digest = ""
+    if workbench_names:
+        workbench_digest = hashlib.sha1(
+            "|".join(workbench_names).encode("utf-8")
+        ).hexdigest()
+
+    return "|".join(
+        [
+            "env-v1",
+            f"platform:{_host_platform_id()}",
+            f"qt:{qVersion()}",
+            f"freecad:{_freecad_version_signature()}",
+            f"build:{_freecad_build_signature()}",
+            f"workbenches:{len(workbench_names)}:{workbench_digest}",
+        ]
+    )
+
+
 def is_native_mode_requested() -> bool:
     env_value = os.environ.get("FREECAD_COMMANDTAB_NATIVE", "").strip().lower()
     if env_value in ["1", "true", "yes", "on"]:
@@ -5393,6 +5462,7 @@ def _load_matching_metadata_cache(
     cache_path: Path,
     expected_structure_key: list,
     theme_signature: list[str],
+    environment_signature: str,
 ) -> dict | None:
     if cache_path.exists() is False:
         return None
@@ -5414,6 +5484,7 @@ def _load_matching_metadata_cache(
         cached_version != _NATIVE_METADATA_CACHE_VERSION
         or cached_payload.get("structureKey") != expected_structure_key
         or cached_payload.get("themeSignature") != theme_signature
+        or str(cached_payload.get("environmentSignature") or "") != environment_signature
     ):
         return None
 
@@ -5438,6 +5509,7 @@ def _load_matching_metadata_cache(
         "panelTitles": panel_titles,
         "builtWorkbenches": [str(item) for item in built_workbenches],
         "quickAccessIncluded": bool(quick_access_included),
+        "environmentSignature": str(cached_payload.get("environmentSignature") or ""),
     }
 
 
@@ -5467,6 +5539,7 @@ def _coerce_metadata_cache_payload(payload) -> dict | None:
         "panelTitles": panel_titles,
         "builtWorkbenches": [str(item) for item in built_workbenches],
         "quickAccessIncluded": bool(quick_access_included),
+        "environmentSignature": str(payload.get("environmentSignature") or ""),
     }
 
 
@@ -5489,12 +5562,16 @@ def _ensure_native_metadata_cache(
         cache_path = _persistent_metadata_cache_path()
         structure_path = _resolve_structure_path()
         theme_signature = list(_native_theme_signature())
+        environment_signature = _native_metadata_environment_signature()
         expected_structure_key = [structure_key[0], structure_key[1], structure_key[2]]
 
         cached_payload = None
         if force is False:
             cached_payload = _load_matching_metadata_cache(
-                cache_path, expected_structure_key, theme_signature
+                cache_path,
+                expected_structure_key,
+                theme_signature,
+                environment_signature,
             )
 
         all_enabled_workbenches = {
@@ -5534,6 +5611,13 @@ def _ensure_native_metadata_cache(
             if command_name == "" or "_separator_" in command_name or command_name.endswith("_separator"):
                 continue
             target_command_ids.add(command_name)
+
+        cache_has_expected_environment_signature = False
+        if isinstance(cached_payload, dict):
+            cache_has_expected_environment_signature = (
+                str(cached_payload.get("environmentSignature") or "")
+                == environment_signature
+            )
 
         if cached_payload is not None and force is False:
             built_workbenches = set(_coerce_list(cached_payload.get("builtWorkbenches", [])))
@@ -5576,6 +5660,7 @@ def _ensure_native_metadata_cache(
                 and len(missing_workbench_icons) == 0
                 and len(missing_panel_titles) == 0
                 and len(missing_command_metadata) == 0
+                and cache_has_expected_environment_signature is True
                 and (
                     include_quick_access is False
                     or quick_access_cached is True
@@ -5597,7 +5682,10 @@ def _ensure_native_metadata_cache(
             include_quick_access=include_quick_access,
         ):
             native_seed_payload = _load_matching_metadata_cache(
-                cache_path, expected_structure_key, theme_signature
+                cache_path,
+                expected_structure_key,
+                theme_signature,
+                environment_signature,
             )
             if native_seed_payload is None:
                 try:
@@ -5623,6 +5711,10 @@ def _ensure_native_metadata_cache(
             panel_titles = _coerce_dict(cached_payload.get("panelTitles", {}))
             built_workbenches = set(_coerce_list(cached_payload.get("builtWorkbenches", [])))
             quick_access_cached = bool(cached_payload.get("quickAccessIncluded", False))
+            cache_has_expected_environment_signature = (
+                str(cached_payload.get("environmentSignature") or "")
+                == environment_signature
+            )
 
         missing_workbench_titles = {
             workbench_name
@@ -5669,6 +5761,7 @@ def _ensure_native_metadata_cache(
             and len(missing_command_metadata) == 0
             and len(workbenches_to_build) == 0
             and quick_access_to_build is False
+            and cache_has_expected_environment_signature is True
             and force is False
         ):
             return cache_path
@@ -5844,6 +5937,7 @@ def _ensure_native_metadata_cache(
                     "cacheVersion": _NATIVE_METADATA_CACHE_VERSION,
                     "structureKey": expected_structure_key,
                     "themeSignature": theme_signature,
+                    "environmentSignature": environment_signature,
                     "workbenchTitles": workbench_titles,
                     "workbenchIcons": workbench_icons,
                     "panelTitles": panel_titles,

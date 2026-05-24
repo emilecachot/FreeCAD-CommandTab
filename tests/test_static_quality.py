@@ -216,3 +216,13 @@ def test_viewport_settings_read_from_runtime_settings_group() -> None:
     assert "_runtime_bool_setting(\"ViewportColorsEnabled\"" in bridge_text
     assert "_runtime_string_setting(\"ViewportBackgroundStyle\"" in bridge_text
     assert "_runtime_color_setting(\"ViewportBgTopColor\"" in bridge_text
+
+
+def test_native_metadata_cache_tracks_freecad_environment_signature() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def _native_metadata_environment_signature()" in bridge_text
+    assert "App.Version()" in bridge_text
+    assert "_available_workbenches().keys()" in bridge_text
+    assert '"environmentSignature"' in bridge_text
