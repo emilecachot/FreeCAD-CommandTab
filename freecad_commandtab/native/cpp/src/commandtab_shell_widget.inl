@@ -501,15 +501,15 @@ public:
         }
 
         if (m_tabBar->count() > 0) {
-            ensureWorkbenchPage(activeIndex, 4, true);
+            ensureWorkbenchPage(activeIndex, 8, true);
             m_tabBar->setCurrentIndex(activeIndex);
             m_stack->setCurrentIndex(activeIndex);
             scheduleBackgroundPageWarmup();
         }
         applyTabTextColors();
         updateTabNavigationButtons();
-        scheduleWorkbenchTabIconRefresh(120);
-        scheduleCommandIconRefresh(40, 2);
+        scheduleWorkbenchTabIconRefresh(80);
+        scheduleCommandIconRefresh(10, 4);
 
         setUpdatesEnabled(true);
         updateGeometry();
@@ -2654,13 +2654,13 @@ QWidget#CommandTabWorkbenchViewport {
 
         pageState.chunkScheduled = true;
         const int delayMs =
-            (m_stack != nullptr && m_stack->currentIndex() == index) ? 0 : 22;
+            (m_stack != nullptr && m_stack->currentIndex() == index) ? 0 : 8;
         QTimer::singleShot(delayMs, this, [this, index]() {
             if (index < 0 || index >= m_pageBuildStates.size()) {
                 return;
             }
             m_pageBuildStates[index].chunkScheduled = false;
-            buildWorkbenchPageChunk(index, 3);
+            buildWorkbenchPageChunk(index, 5);
         });
     }
 
@@ -2724,7 +2724,7 @@ QWidget#CommandTabWorkbenchViewport {
             return;
         }
         m_backgroundPageWarmupScheduled = true;
-        QTimer::singleShot(240, this, [this]() {
+        QTimer::singleShot(60, this, [this]() {
             m_backgroundPageWarmupScheduled = false;
             continueBackgroundPageWarmup();
         });
@@ -2758,7 +2758,7 @@ QWidget#CommandTabWorkbenchViewport {
             }
 
             m_backgroundWarmupCursor = candidateIndex + 1;
-            ensureWorkbenchPage(candidateIndex, 2, true);
+            ensureWorkbenchPage(candidateIndex, 8, false);
             scheduleBackgroundPageWarmup();
             return;
         }

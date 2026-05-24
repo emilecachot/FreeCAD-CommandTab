@@ -97,6 +97,9 @@ _CPP_STARTUP_ORCHESTRATION_ENABLED = str(
 _NATIVE_EAGER_ALL_PANELS_ON_ACTIVATE = str(
     os.environ.get("FREECAD_COMMANDTAB_EAGER_ALL_PANELS", "0") or "0"
 ).strip().lower() not in {"0", "false", "no", "off"}
+_NATIVE_STARTUP_PRELOAD_ALL_PANELS_ENABLED = str(
+    os.environ.get("FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "1") or "1"
+).strip().lower() not in {"0", "false", "no", "off"}
 try:
     _PAYLOAD_CACHE_MAX_ENTRIES = max(
         4,
@@ -598,6 +601,10 @@ def is_cpp_startup_orchestration_enabled() -> bool:
 
 def _is_native_eager_all_panels_on_activate() -> bool:
     return bool(_NATIVE_EAGER_ALL_PANELS_ON_ACTIVATE)
+
+
+def _is_native_startup_preload_all_panels_enabled() -> bool:
+    return bool(_NATIVE_STARTUP_PRELOAD_ALL_PANELS_ENABLED)
 
 
 def _metadata_scope_all_workbench_icons_enabled() -> bool:
@@ -6411,14 +6418,20 @@ class NativeCommandTabController:
                 return True
 
             if _is_cpp_bootstrap_pipeline_enabled() is True:
+                eager_startup_panels = (
+                    _is_native_eager_all_panels_on_activate()
+                    or _is_native_startup_preload_all_panels_enabled()
+                )
                 active_workbench, payload, loaded_workbenches, full_model_loaded = (
                     _build_native_bootstrap_payload_safe(
-                        include_all_panels=_is_native_eager_all_panels_on_activate()
+                        include_all_panels=eager_startup_panels
                     )
                 )
             else:
                 active_workbench, payload, loaded_workbenches, full_model_loaded = (
-                    _build_native_model_payload_safe(include_all_panels=False)
+                    _build_native_model_payload_safe(
+                        include_all_panels=_is_native_startup_preload_all_panels_enabled()
+                    )
                 )
 
             main_window = Gui.getMainWindow()
@@ -6519,7 +6532,10 @@ class NativeCommandTabController:
                     include_quick_access=True,
                     force=False,
                 )
-                self.refresh(force=True, include_all_panels=False)
+                self.refresh(
+                    force=True,
+                    include_all_panels=_is_native_startup_preload_all_panels_enabled(),
+                )
             except Exception:
                 _logger.exception("native startup repair pass failed")
 
@@ -7041,7 +7057,10 @@ class NativeCommandTabController:
                     if self._set_active_workbench(workbench_name):
                         return
                 if self._upsert_workbench(workbench_name, activate=True) is False:
-                    self.refresh(force=True, include_all_panels=False)
+                    self.refresh(
+                        force=True,
+                        include_all_panels=_is_native_startup_preload_all_panels_enabled(),
+                    )
                 self._schedule_warmup()
             except Exception:
                 pass

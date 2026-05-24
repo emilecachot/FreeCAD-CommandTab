@@ -308,7 +308,7 @@ DefaultSettings = {
     "NativeThemeMode": "auto",
     "IconThemeMode": "original",
     "PreferNativeCommandTab": True,
-    "NativeCommandTabWarmup": False,
+    "NativeCommandTabWarmup": True,
     "TabClickPopupMode": False,
     "CheckForUpdatesOnStartup": False,
     "EagerLoadCommandTabDependencies": False,
@@ -713,7 +713,7 @@ if Settings.GetBoolSetting("NativeCommandTabWarmup") is None:
     NATIVE_COMMANDTAB_WARMUP = bool(DefaultSettings["NativeCommandTabWarmup"])
     Settings.SetBoolSetting("NativeCommandTabWarmup", NATIVE_COMMANDTAB_WARMUP)
 elif Settings.GetBoolSetting("NativeCommandTabWarmupMigrated20260404") is None:
-    NATIVE_COMMANDTAB_WARMUP = False
+    NATIVE_COMMANDTAB_WARMUP = True
     Settings.SetBoolSetting("NativeCommandTabWarmup", NATIVE_COMMANDTAB_WARMUP)
     Settings.SetBoolSetting("NativeCommandTabWarmupMigrated20260404", True)
 
