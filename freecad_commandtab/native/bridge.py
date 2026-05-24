@@ -18,7 +18,7 @@ from pathlib import Path
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide.QtCore import QByteArray, QFileInfo, QLocale, QSize, Qt, QTimer, qVersion
+from PySide.QtCore import QByteArray, QFileInfo, QLocale, QCoreApplication, QSize, Qt, QTimer, qVersion
 from PySide.QtGui import QApplication, QColor, QIcon, QPainter, QPixmap
 from PySide.QtWidgets import QToolBar, QToolButton, QWidget
 
@@ -76,6 +76,9 @@ _WORKBENCH_BOOTSTRAP_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], st
 _WORKBENCH_BOOTSTRAP_STATE_CACHE: dict[str, dict[str, object]] = {}
 _VARIANT_MENU_CACHE_MEMORY: dict[str, object] = {}
 _STATIC_COMMAND_VARIANT_MENU_CACHE: dict[str, list[object]] | None = None
+_COMMAND_DISPLAY_TEXT_OVERRIDES: dict[str, tuple[str, str]] = {
+    "PartDesign_CompSketches": ("CmdPartDesignNewSketch", "New Sketch"),
+}
 _WORKBENCH_PRELOAD_IN_PROGRESS = False
 _WORKBENCH_PRELOAD_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PRELOAD_WORKBENCHES", "0") or "0"
@@ -1115,6 +1118,8 @@ def _native_settings_state_json() -> str:
             "modernCommandTabStyleEnabled": bool(getattr(Parameters_CommandTab, "MODERN_COMMANDTAB_STYLE_ENABLED", True)),
             "hideMenuBarInNativeMode": bool(getattr(Parameters_CommandTab, "HIDE_MENUBAR_IN_NATIVE_MODE", True)),
             "nativeThemeMode": _string_setting("NativeThemeMode", _native_theme_mode_setting()),
+            "ribbonSurfaceStyle": _runtime_string_setting("RibbonSurfaceStyle", "glass"),
+            "ribbonSurfaceTransparent": _runtime_bool_setting("RibbonSurfaceTransparent", False),
             "compactPanelLayout": _bool_setting("NativeCompactPanelLayout", True),
             "panelDropdownModeEnabled": _bool_setting("NativePanelDropdownModeEnabled", False),
             "panelDropdownPrimaryRecent": _bool_setting("NativePanelDropdownPrimaryRecent", False),
@@ -1439,6 +1444,10 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     custom_ribbon_primary_color = _normalized_color(payload.get("customRibbonPrimaryColor", ""), "")
     custom_ribbon_secondary_color = _normalized_color(payload.get("customRibbonSecondaryColor", ""), "")
     custom_ribbon_accent_color = _normalized_color(payload.get("customRibbonAccentColor", ""), "")
+    ribbon_surface_style = str(payload.get("ribbonSurfaceStyle", "glass") or "glass").strip().lower()
+    if ribbon_surface_style not in ["mat", "normal", "glass"]:
+        ribbon_surface_style = "glass"
+    ribbon_surface_transparent = bool(payload.get("ribbonSurfaceTransparent", False))
     ribbon_auto_hide = bool(payload.get("ribbonAutoHide", False))
     ribbon_auto_hide_delay_ms = int(payload.get("ribbonAutoHideDelayMs", 1500))
     ribbon_hover_tab = bool(payload.get("ribbonHoverTab", False))
@@ -1521,6 +1530,12 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab").SetString(
         "NativeCustomRibbonAccentColor", custom_ribbon_accent_color
     )
+    _ct_settings = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab/Settings")
+    _ct_settings.SetString("RibbonSurfaceStyle", ribbon_surface_style)
+    _ct_settings.SetBool("RibbonSurfaceTransparent", ribbon_surface_transparent)
+    _ct_root_settings = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab")
+    _ct_root_settings.SetString("RibbonSurfaceStyle", ribbon_surface_style)
+    _ct_root_settings.SetBool("RibbonSurfaceTransparent", ribbon_surface_transparent)
 
     Parameters_CommandTab.PREFER_NATIVE_COMMANDTAB = prefer_native_commandtab
     Parameters_CommandTab.NATIVE_COMMANDTAB_WARMUP = native_commandtab_warmup
@@ -1557,7 +1572,6 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     Parameters_CommandTab.Settings.SetBoolSetting("RibbonHoverTab", ribbon_hover_tab)
     Parameters_CommandTab.Settings.SetBoolSetting("TabClickPopupMode", tab_click_popup_mode)
     Parameters_CommandTab.TAB_CLICK_POPUP_MODE = tab_click_popup_mode
-    _ct_settings = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab/Settings")
     _ct_settings.SetBool("ViewportColorsEnabled", viewport_colors_enabled)
     _ct_settings.SetString("ViewportBackgroundStyle", viewport_background_style)
     _ct_settings.SetString("ViewportBgTopColor", viewport_bg_top_color)
@@ -1566,7 +1580,6 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     _ct_settings.SetString("ViewportBgAccentColor", viewport_bg_accent_color)
     _ct_settings.SetBool("GridColorEnabled", grid_color_enabled)
     _ct_settings.SetString("ViewportGridColor", viewport_grid_color)
-    _ct_root_settings = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab")
     _ct_root_settings.SetBool("ViewportColorsEnabled", viewport_colors_enabled)
     _ct_root_settings.SetString("ViewportBackgroundStyle", viewport_background_style)
     _ct_root_settings.SetString("ViewportBgTopColor", viewport_bg_top_color)
@@ -3358,6 +3371,24 @@ def _load_static_command_variant_menu_specs() -> dict[str, list[object]]:
     return specs
 
 
+def _static_variant_child_command_ids(command_name: str) -> list[str]:
+    command_name = str(command_name or "").strip()
+    if command_name == "":
+        return []
+    if _STATIC_COMMAND_VARIANT_MENU_CACHE is None:
+        _load_static_command_variant_menu_specs()
+    specs = _STATIC_COMMAND_VARIANT_MENU_CACHE or {}
+    child_ids: list[str] = []
+    for child_spec in specs.get(command_name, []):
+        if isinstance(child_spec, dict):
+            child_id = str(child_spec.get("id") or "").strip()
+        else:
+            child_id = str(child_spec or "").strip()
+        if child_id != "" and not child_id.startswith("__commandtab_action__:"):
+            child_ids.append(child_id)
+    return child_ids
+
+
 def _build_static_variant_menu_entry(
     child_spec,
     command_data: dict,
@@ -4623,6 +4654,12 @@ def _structure_language_matches_current() -> bool:
 
 
 def _resolved_command_display_text(command_name: str, command_data: dict, command_info: dict) -> str:
+    override = _COMMAND_DISPLAY_TEXT_OVERRIDES.get(str(command_name or "").strip())
+    if override is not None:
+        context, source_text = override
+        translated = str(QCoreApplication.translate(context, source_text) or "").strip()
+        return translated if translated else source_text
+
     resolved_text = _normalized_visible_text(
         str(
             command_info.get("DisplayText")
@@ -5702,6 +5739,8 @@ def _iter_structure_command_entries(
             for command_name in _coerce_list(panel_data.get("order", [])):
                 command_name = str(command_name or "")
                 yield command_name, _coerce_dict(commands.get(command_name, {}))
+                for child_command_name in _static_variant_child_command_ids(command_name):
+                    yield child_command_name, {}
                 if command_name.endswith("_ddb"):
                     for dropdown_item in _dropdown_button_map(structure).get(command_name, []):
                         if isinstance(dropdown_item, (list, tuple)) and len(dropdown_item) >= 1:
@@ -5713,6 +5752,8 @@ def _iter_structure_command_entries(
                 command_id = str(command.get("id") or "")
                 if command_id != "":
                     yield command_id, {}
+                    for child_command_name in _static_variant_child_command_ids(command_id):
+                        yield child_command_name, {}
                 if str(command.get("type") or "") == "dropdown":
                     for menu_command in command.get("menuCommands", []):
                         menu_command_id = str(menu_command.get("id") or "")

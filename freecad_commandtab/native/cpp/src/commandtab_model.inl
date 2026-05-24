@@ -46,6 +46,8 @@ struct CommandTabSettingsState
     bool modernCommandTabStyleEnabled = true;
     bool hideMenuBarInNativeMode = true;
     QString nativeThemeMode = QStringLiteral("auto");
+    QString ribbonSurfaceStyle = QStringLiteral("glass");
+    bool ribbonSurfaceTransparent = false;
     bool compactPanelLayout = true;
     int compactPanelSpacing = 1;
     int compactButtonPadding = 3;
@@ -1000,12 +1002,15 @@ QString nativeHeaderLogoResource(const CommandTabModel::CommandTabTheme& theme)
         : QStringLiteral(":/theme/light/more_arrow");
 }
 
+QString correctedCommandDisplayText(const QString& commandId, QString text);
+
 CommandTabCommandEntry parseCommand(const QJsonObject& object)
 {
     CommandTabCommandEntry command;
     command.type = object.value(QStringLiteral("type")).toString(QStringLiteral("command"));
     command.id = object.value(QStringLiteral("id")).toString();
     command.text = object.value(QStringLiteral("text")).toString();
+    command.text = correctedCommandDisplayText(command.id, command.text);
     command.iconPath = object.value(QStringLiteral("iconPath")).toString();
     command.shortcut = object.value(QStringLiteral("shortcut")).toString();
     command.size = object.value(QStringLiteral("size")).toString(QStringLiteral("small"));
@@ -1182,6 +1187,8 @@ QJsonObject settingsToJsonObject(const CommandTabSettingsState& state)
     object.insert(QStringLiteral("modernCommandTabStyleEnabled"), state.modernCommandTabStyleEnabled);
     object.insert(QStringLiteral("hideMenuBarInNativeMode"), state.hideMenuBarInNativeMode);
     object.insert(QStringLiteral("nativeThemeMode"), state.nativeThemeMode);
+    object.insert(QStringLiteral("ribbonSurfaceStyle"), state.ribbonSurfaceStyle);
+    object.insert(QStringLiteral("ribbonSurfaceTransparent"), state.ribbonSurfaceTransparent);
     object.insert(QStringLiteral("compactPanelLayout"), state.compactPanelLayout);
     object.insert(QStringLiteral("compactPanelSpacing"), state.compactPanelSpacing);
     object.insert(QStringLiteral("compactButtonPadding"), state.compactButtonPadding);
@@ -1381,8 +1388,11 @@ void applySettingsToWorkbench(CommandTabWorkbenchEntry& workbench, const Command
 
 QString correctedCommandDisplayText(const QString& commandId, QString text)
 {
-    Q_UNUSED(commandId);
     text = text.replace(QStringLiteral("&"), QString()).simplified();
+    if (commandId == QStringLiteral("PartDesign_CompSketches")) {
+        const QString translated = QCoreApplication::translate("CmdPartDesignNewSketch", "New Sketch");
+        return translated.trimmed().isEmpty() ? QStringLiteral("New Sketch") : translated.simplified();
+    }
     return text;
 }
 
@@ -1648,6 +1658,21 @@ CommandTabSettingsState parseSettingsState(const QJsonObject& object)
     } else {
         state.nativeThemeMode = QStringLiteral("auto");
     }
+    state.ribbonSurfaceStyle =
+        object.value(QStringLiteral("ribbonSurfaceStyle"))
+            .toString(state.ribbonSurfaceStyle)
+            .trimmed()
+            .toLower();
+    if (
+        state.ribbonSurfaceStyle != QStringLiteral("mat")
+        && state.ribbonSurfaceStyle != QStringLiteral("normal")
+        && state.ribbonSurfaceStyle != QStringLiteral("glass")
+    ) {
+        state.ribbonSurfaceStyle = QStringLiteral("glass");
+    }
+    state.ribbonSurfaceTransparent =
+        object.value(QStringLiteral("ribbonSurfaceTransparent"))
+            .toBool(state.ribbonSurfaceTransparent);
     state.ribbonAutoHide = object.value(QStringLiteral("ribbonAutoHide")).toBool(false);
     state.ribbonAutoHideDelayMs = object.value(QStringLiteral("ribbonAutoHideDelayMs")).toInt(1500);
     state.ribbonHoverTab = object.value(QStringLiteral("ribbonHoverTab")).toBool(false);

@@ -94,6 +94,26 @@ public:
         m_nativeThemeModeCombo->addItem(trLabel("Dark"), QStringLiteral("dark"));
         m_nativeThemeModeCombo->addItem(trLabel("Light"), QStringLiteral("light"));
         generalLayout->addWidget(m_nativeThemeModeCombo, generalRow++, 1);
+
+        generalLayout->addWidget(new QLabel(trLabel("Ribbon surface"), generalTab), generalRow, 0);
+        m_ribbonSurfaceStyleCombo = new QComboBox(generalTab);
+        m_ribbonSurfaceStyleCombo->addItem(trLabel("Mat"), QStringLiteral("mat"));
+        m_ribbonSurfaceStyleCombo->addItem(trLabel("Normal"), QStringLiteral("normal"));
+        m_ribbonSurfaceStyleCombo->addItem(trLabel("Glass"), QStringLiteral("glass"));
+        m_ribbonSurfaceStyleCombo->setToolTip(
+            trLabel("Choose the visual material used by ribbon panels, tabs and command buttons.")
+        );
+        generalLayout->addWidget(m_ribbonSurfaceStyleCombo, generalRow++, 1);
+
+        m_ribbonSurfaceTransparentCheck = new QCheckBox(
+            trLabel("Use transparent ribbon surfaces"),
+            generalTab
+        );
+        m_ribbonSurfaceTransparentCheck->setToolTip(
+            trLabel("Reduce surface opacity for a cleaner translucent interface.")
+        );
+        generalLayout->addWidget(m_ribbonSurfaceTransparentCheck, generalRow++, 0, 1, 2);
+
         m_nativeThemePreviewLabel = new QLabel(generalTab);
         m_nativeThemePreviewLabel->setObjectName(QStringLiteral("CommandTabNativeThemePreview"));
         m_nativeThemePreviewLabel->setAlignment(Qt::AlignCenter);
@@ -899,6 +919,15 @@ QSpinBox::up-button, QSpinBox::down-button {
             nativeThemeIndex = 0;
         }
         m_nativeThemeModeCombo->setCurrentIndex(nativeThemeIndex);
+        int surfaceStyleIndex = m_ribbonSurfaceStyleCombo->findData(state.ribbonSurfaceStyle);
+        if (surfaceStyleIndex < 0) {
+            surfaceStyleIndex = m_ribbonSurfaceStyleCombo->findData(QStringLiteral("glass"));
+        }
+        if (surfaceStyleIndex < 0) {
+            surfaceStyleIndex = 0;
+        }
+        m_ribbonSurfaceStyleCombo->setCurrentIndex(surfaceStyleIndex);
+        m_ribbonSurfaceTransparentCheck->setChecked(state.ribbonSurfaceTransparent);
         m_customMainColorsEnabledCheck->setChecked(state.customMainColorsEnabled);
         m_customMainBackgroundColor = QColor(state.customMainBackgroundColor.trimmed());
         if (!m_customMainBackgroundColor.isValid()) {
@@ -1932,6 +1961,8 @@ QLabel#CommandTabColorPreviewPanelBody {
         payload.insert(QStringLiteral("ribbonHoverTab"), m_ribbonHoverTabCheck->isChecked());
         payload.insert(QStringLiteral("tabClickPopupMode"), m_tabClickPopupModeCheck->isChecked());
         payload.insert(QStringLiteral("nativeThemeMode"), m_nativeThemeModeCombo->currentData().toString());
+        payload.insert(QStringLiteral("ribbonSurfaceStyle"), m_ribbonSurfaceStyleCombo->currentData().toString());
+        payload.insert(QStringLiteral("ribbonSurfaceTransparent"), m_ribbonSurfaceTransparentCheck->isChecked());
         payload.insert(QStringLiteral("compactPanelLayout"), m_compactPanelLayoutCheck->isChecked());
         payload.insert(QStringLiteral("panelDropdownModeEnabled"), m_panelDropdownModeCheck->isChecked());
         payload.insert(
@@ -2026,6 +2057,8 @@ QLabel#CommandTabColorPreviewPanelBody {
     QSpinBox* m_ribbonAutoHideDelaySpinner = nullptr;
     QCheckBox* m_ribbonHoverTabCheck = nullptr;
     QCheckBox* m_tabClickPopupModeCheck = nullptr;
+    QComboBox* m_ribbonSurfaceStyleCombo = nullptr;
+    QCheckBox* m_ribbonSurfaceTransparentCheck = nullptr;
     QCheckBox* m_compactPanelLayoutCheck = nullptr;
     QCheckBox* m_panelDropdownModeCheck = nullptr;
     QCheckBox* m_panelDropdownPrimaryRecentCheck = nullptr;

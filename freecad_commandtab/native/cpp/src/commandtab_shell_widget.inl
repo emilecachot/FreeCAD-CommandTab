@@ -516,6 +516,8 @@ public:
             m_tabBar->setCurrentIndex(activeIndex);
             m_stack->setCurrentIndex(activeIndex);
             scheduleBackgroundPageWarmup();
+            rebuildIconPreloadQueue();
+            scheduleIconPreload(0);
             scheduleFullPagePreload();
         }
         startCommandStatePolling();
@@ -564,6 +566,9 @@ public:
             || state.customRibbonPrimaryColor != m_settingsState.customRibbonPrimaryColor
             || state.customRibbonSecondaryColor != m_settingsState.customRibbonSecondaryColor
             || state.customRibbonAccentColor != m_settingsState.customRibbonAccentColor;
+        const bool surfaceStyleChanged =
+            state.ribbonSurfaceStyle != m_settingsState.ribbonSurfaceStyle
+            || state.ribbonSurfaceTransparent != m_settingsState.ribbonSurfaceTransparent;
         const bool textVisibilityChanged =
             state.showIconTextSmall != m_settingsState.showIconTextSmall
             || state.showIconTextMedium != m_settingsState.showIconTextMedium
@@ -608,6 +613,8 @@ public:
             m_model.theme = m_theme;
             applyThemeStyleSheet();
             updateBrandWidget();
+        } else if (surfaceStyleChanged) {
+            applyThemeStyleSheet();
         }
 
         if (headerScaleChanged) {
@@ -655,6 +662,7 @@ public:
             && !headerScaleChanged
             && !commandtabScaleChanged
             && !panelDropdownModeChanged
+            && !surfaceStyleChanged
             && !tabClickPopupModeChanged
         ) {
             return true;
@@ -667,6 +675,7 @@ public:
             && !compactLayoutChanged
             && !commandtabScaleChanged
             && !panelDropdownModeChanged
+            && !surfaceStyleChanged
             && !tabClickPopupModeChanged
         ) {
             updateGeometry();
@@ -1796,6 +1805,29 @@ QToolButton:disabled {
     void applyThemeStyleSheet()
     {
         const bool forceTextColor = m_theme.forceTextColor && m_theme.buttonText.isValid();
+        const QString surfaceStyle = m_settingsState.ribbonSurfaceStyle.trimmed().toLower();
+        const bool surfaceMat = surfaceStyle == QStringLiteral("mat");
+        const bool surfaceNormal = surfaceStyle == QStringLiteral("normal");
+        const bool transparentSurfaces = m_settingsState.ribbonSurfaceTransparent;
+        auto surfaceAlpha = [surfaceMat, surfaceNormal, transparentSurfaces](int glassAlpha) -> int {
+            qreal factor = 1.0;
+            if (surfaceMat) {
+                factor = 0.92;
+            } else if (surfaceNormal) {
+                factor = 0.96;
+            }
+            if (transparentSurfaces) {
+                factor *= surfaceMat ? 0.70 : 0.62;
+            }
+            return std::clamp(qRound(static_cast<qreal>(glassAlpha) * factor), 48, 255);
+        };
+        auto highlightAlpha = [surfaceMat, surfaceNormal, transparentSurfaces](int glassAlpha) -> int {
+            qreal factor = surfaceMat ? 0.18 : (surfaceNormal ? 0.46 : 1.0);
+            if (transparentSurfaces) {
+                factor *= 0.76;
+            }
+            return std::clamp(qRound(static_cast<qreal>(glassAlpha) * factor), 0, 255);
+        };
         const QColor headerTopBase = blendColors(
             blendColors(m_theme.shellBackground, m_theme.panelCardBackground, 0.20),
             m_theme.tabAccent,
@@ -1806,13 +1838,13 @@ QToolButton:disabled {
             m_theme.tabAccent,
             m_theme.isDark ? 0.08 : 0.05
         );
-        const QColor headerTop = withAlpha(headerTopBase, m_theme.isDark ? 186 : 218);
-        const QColor headerBottom = withAlpha(headerBottomBase, m_theme.isDark ? 166 : 196);
+        const QColor headerTop = withAlpha(headerTopBase, surfaceAlpha(m_theme.isDark ? 186 : 218));
+        const QColor headerBottom = withAlpha(headerBottomBase, surfaceAlpha(m_theme.isDark ? 166 : 196));
         const QColor headerSurface = blendColors(headerTop, headerBottom, 0.50);
         const QColor headerLine = withAlpha(blendColors(m_theme.shellBorder, m_theme.panelCardBorder, 0.34), 194);
         const QColor sectionSurface = withAlpha(
             blendColors(m_theme.panelCardBackground, m_theme.quickBackground, 0.28),
-            m_theme.isDark ? 108 : 164
+            surfaceAlpha(m_theme.isDark ? 108 : 164)
         );
         const QColor hoverSurface = withAlpha(blendColors(m_theme.quickHoverBackground, m_theme.panelBodyTop, 0.24), 214);
         const QColor primaryText = m_theme.buttonText;
@@ -1861,7 +1893,7 @@ QToolButton:disabled {
                 0.26
             )
             : blendColors(m_theme.tabSelectedBackground, m_theme.panelFooterBackground, 0.24);
-        const QColor brandSurface = withAlpha(brandSurfaceSeed, m_theme.isDark ? 220 : 238);
+        const QColor brandSurface = withAlpha(brandSurfaceSeed, surfaceAlpha(m_theme.isDark ? 220 : 238));
         const QColor brandBorder = withAlpha(
             blendColors(m_theme.tabSelectedBorder, m_theme.buttonActiveBorder, 0.42),
             m_theme.isDark ? 200 : 194
@@ -1875,18 +1907,18 @@ QToolButton:disabled {
                 0.22
             )
             : blendColors(m_theme.panelFooterBackground, m_theme.panelCardBackground, 0.18);
-        const QColor panelFooterSurface = withAlpha(panelFooterSeed, m_theme.isDark ? 184 : 214);
+        const QColor panelFooterSurface = withAlpha(panelFooterSeed, surfaceAlpha(m_theme.isDark ? 184 : 214));
         const QColor panelFooterLine = withAlpha(
             blendColors(m_theme.panelFooterBorder, m_theme.shellBorder, m_theme.isDark ? 0.36 : 0.24),
             m_theme.isDark ? 198 : 184
         );
         const QColor glassHighlight = withAlpha(
             blendColors(m_theme.tabAccent, QColor(QStringLiteral("#ffffff")), m_theme.isDark ? 0.72 : 0.82),
-            m_theme.isDark ? 148 : 188
+            highlightAlpha(m_theme.isDark ? 148 : 188)
         );
         const QColor glassRimTop = withAlpha(
             blendColors(m_theme.shellBorder, QColor(QStringLiteral("#ffffff")), m_theme.isDark ? 0.42 : 0.58),
-            m_theme.isDark ? 174 : 206
+            highlightAlpha(m_theme.isDark ? 174 : 206)
         );
         const QColor glassRimBottom = withAlpha(
             blendColors(m_theme.shellBorder, QColor(QStringLiteral("#0f1724")), m_theme.isDark ? 0.40 : 0.24),
@@ -1894,7 +1926,7 @@ QToolButton:disabled {
         );
         const QColor tabSelectedShine = withAlpha(
             blendColors(tabSelectedSurface, QColor(QStringLiteral("#ffffff")), m_theme.isDark ? 0.30 : 0.46),
-            m_theme.isDark ? 190 : 232
+            highlightAlpha(m_theme.isDark ? 190 : 232)
         );
         const QColor utilitySurfaceTop = withAlpha(
             blendColors(utilitySurface, QColor(QStringLiteral("#ffffff")), m_theme.isDark ? 0.26 : 0.44),
@@ -1902,7 +1934,7 @@ QToolButton:disabled {
         );
         const QColor topTabGlassSurface = withAlpha(
             blendColors(utilitySurface, m_theme.panelCardBackground, m_theme.isDark ? 0.36 : 0.24),
-            m_theme.isDark ? 154 : 198
+            surfaceAlpha(m_theme.isDark ? 154 : 198)
         );
         const QColor topTabGlassBorder = withAlpha(
             blendColors(m_theme.quickBorder, m_theme.tabSelectedBorder, 0.34),
@@ -1910,11 +1942,11 @@ QToolButton:disabled {
         );
         const QColor topTabGlassHighlight = withAlpha(
             blendColors(m_theme.tabAccent, QColor(QStringLiteral("#ffffff")), m_theme.isDark ? 0.70 : 0.82),
-            m_theme.isDark ? 110 : 156
+            highlightAlpha(m_theme.isDark ? 110 : 156)
         );
         const QColor panelTitleSurface = withAlpha(
             blendColors(panelFooterSurface, m_theme.tabSelectedBackground, m_theme.isDark ? 0.30 : 0.20),
-            m_theme.isDark ? 166 : 206
+            surfaceAlpha(m_theme.isDark ? 166 : 206)
         );
         const QColor panelTitleBorder = withAlpha(
             blendColors(panelFooterLine, m_theme.tabSelectedBorder, 0.28),
@@ -1922,7 +1954,7 @@ QToolButton:disabled {
         );
         const QColor panelTitleShine = withAlpha(
             blendColors(panelTitleSurface, QColor(QStringLiteral("#ffffff")), m_theme.isDark ? 0.56 : 0.74),
-            m_theme.isDark ? 88 : 136
+            highlightAlpha(m_theme.isDark ? 88 : 136)
         );
         const QColor panelTitleText = forceTextColor
             ? primaryText
@@ -2896,6 +2928,61 @@ QWidget#CommandTabWorkbenchViewport {
             m_fullPagePreloadScheduled = false;
             continueFullPagePreload();
         });
+    }
+
+    void enqueueIconPreloadCommand(const CommandTabCommandEntry& command)
+    {
+        if (command.type == QStringLiteral("separator")) {
+            return;
+        }
+        if (!command.id.trimmed().isEmpty() || !command.iconPath.trimmed().isEmpty()) {
+            m_iconPreloadQueue.push_back(command);
+        }
+        for (const auto& menuCommand : command.menuCommands) {
+            enqueueIconPreloadCommand(menuCommand);
+        }
+    }
+
+    void rebuildIconPreloadQueue()
+    {
+        m_iconPreloadQueue.clear();
+        m_iconPreloadCursor = 0;
+        for (const auto& command : m_model.quickAccess) {
+            enqueueIconPreloadCommand(command);
+        }
+        for (const auto& workbench : m_workbenchEntries) {
+            for (const auto& panel : workbench.panels) {
+                for (const auto& command : panel.commands) {
+                    enqueueIconPreloadCommand(command);
+                }
+            }
+        }
+    }
+
+    void scheduleIconPreload(int delayMs = 1)
+    {
+        if (m_iconPreloadScheduled || m_iconPreloadCursor >= m_iconPreloadQueue.size()) {
+            return;
+        }
+        m_iconPreloadScheduled = true;
+        QTimer::singleShot(std::max(0, delayMs), this, [this]() {
+            m_iconPreloadScheduled = false;
+            continueIconPreload();
+        });
+    }
+
+    void continueIconPreload()
+    {
+        const int budget = 24;
+        int processed = 0;
+        while (m_iconPreloadCursor < m_iconPreloadQueue.size() && processed < budget) {
+            loadCommandEntryIcon(m_iconPreloadQueue.at(m_iconPreloadCursor));
+            ++m_iconPreloadCursor;
+            ++processed;
+        }
+        if (m_iconPreloadCursor < m_iconPreloadQueue.size()) {
+            scheduleIconPreload(1);
+        }
     }
 
     void continueFullPagePreload()
@@ -3947,8 +4034,9 @@ QWidget#CommandTabWorkbenchViewport {
         titleLabel->setFrameStyle(QFrame::NoFrame);
         {
             QFont titleFont = titleLabel->font();
-            titleFont.setPointSize(std::clamp(scaledPx(10), 7, 20));
+            titleFont.setPixelSize(std::clamp(scaledPx(12), 10, 24));
             titleFont.setWeight(QFont::Bold);
+            titleFont.setStyleStrategy(QFont::PreferAntialias);
             titleLabel->setFont(titleFont);
         }
         titleLabel->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
@@ -4507,6 +4595,9 @@ private:
     bool m_fullPagePreloadScheduled = false;
     int m_fullPagePreloadCursor = 0;
     bool m_fullPagePreloadCompleted = false;
+    QVector<CommandTabCommandEntry> m_iconPreloadQueue;
+    int m_iconPreloadCursor = 0;
+    bool m_iconPreloadScheduled = false;
     QToolButton* m_gridToggleButton = nullptr;
     QToolButton* m_collapseButton = nullptr;
     QPropertyAnimation* m_stackAnimation = nullptr;

@@ -252,6 +252,61 @@ def test_native_metadata_cache_tracks_freecad_environment_signature() -> None:
     assert '"environmentSignature"' in bridge_text
 
 
+def test_ribbon_surface_settings_contract_present() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    model_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_model.inl").read_text(
+        encoding="utf-8"
+    )
+    dialog_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_settings_dialog.inl").read_text(
+        encoding="utf-8"
+    )
+    shell_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl").read_text(
+        encoding="utf-8"
+    )
+    widget_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_widgets.inl").read_text(
+        encoding="utf-8"
+    )
+
+    assert "RibbonSurfaceStyle" in bridge_text
+    assert "RibbonSurfaceTransparent" in bridge_text
+    assert "ribbonSurfaceStyle" in model_text
+    assert "ribbonSurfaceTransparent" in model_text
+    assert "Ribbon surface" in dialog_text
+    assert "Use transparent ribbon surfaces" in dialog_text
+    assert "surfaceStyleChanged" in shell_text
+    assert "m_surfaceStyle" in widget_text
+
+
+def test_part_design_sketch_compound_label_is_corrected() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    model_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_model.inl").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"PartDesign_CompSketches": ("CmdPartDesignNewSketch", "New Sketch")' in bridge_text
+    assert 'commandId == QStringLiteral("PartDesign_CompSketches")' in model_text
+    assert 'QCoreApplication::translate("CmdPartDesignNewSketch", "New Sketch")' in model_text
+
+
+def test_native_icon_cache_preloads_static_variant_children() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    shell_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def _static_variant_child_command_ids(command_name: str) -> list[str]:" in bridge_text
+    assert "for child_command_name in _static_variant_child_command_ids(command_name)" in bridge_text
+    assert "rebuildIconPreloadQueue()" in shell_text
+    assert "scheduleIconPreload(0)" in shell_text
+    assert "loadCommandEntryIcon(m_iconPreloadQueue.at(m_iconPreloadCursor))" in shell_text
+
+
 def test_native_runtime_and_bootstrap_payload_cache_are_user_scoped() -> None:
     bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
         encoding="utf-8"
