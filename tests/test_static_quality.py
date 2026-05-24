@@ -276,12 +276,14 @@ def test_startup_variant_menu_repair_is_enabled() -> None:
         encoding="utf-8"
     )
     assert "_NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 2" in bridge_text
-    assert "def _payload_has_menu_commands(payload: str) -> bool:" in bridge_text
+    assert "def _payload_has_command_variant_menus(payload: str) -> bool:" in bridge_text
+    assert 'command_type == "command"' in bridge_text
     assert "def _schedule_variant_menu_repair_if_needed(self, payload: str) -> None:" in bridge_text
     assert "def _run_variant_menu_repair(self) -> None:" in bridge_text
     assert "self._schedule_variant_menu_repair_if_needed(payload)" in bridge_text
     assert "def _clear_runtime_payload_caches() -> None:" in bridge_text
     assert "_clear_runtime_payload_caches()" in bridge_text
-    assert "if _is_cpp_bootstrap_pipeline_enabled() is True:" in bridge_text
     assert "_build_native_model_payload_safe(" in bridge_text
     assert "self._last_bootstrap_state = {}" in bridge_text
+    assert "_NATIVE_VARIANT_MENU_REPAIR_MAX_ATTEMPTS" in bridge_text
+    assert "self._variant_menu_repair_attempt_count += 1" in bridge_text

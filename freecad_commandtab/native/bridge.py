@@ -132,6 +132,10 @@ _AVAILABLE_WORKBENCHES_CACHE_TTL_S = 0.45
 _NATIVE_VARIANT_MENU_REPAIR_DELAY_MS = int(
     os.environ.get("FREECAD_COMMANDTAB_VARIANT_MENU_REPAIR_DELAY_MS", "900") or "900"
 )
+_NATIVE_VARIANT_MENU_REPAIR_MAX_ATTEMPTS = max(
+    1,
+    int(os.environ.get("FREECAD_COMMANDTAB_VARIANT_MENU_REPAIR_MAX_ATTEMPTS", "4") or "4"),
+)
 _MAIN_WINDOW_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/MainWindow")
 _COMMANDTAB_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab")
 _GENERAL_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/General")
@@ -160,7 +164,7 @@ def _coerce_list(value) -> list:
     return list(value) if isinstance(value, list) else []
 
 
-def _payload_has_menu_commands(payload: str) -> bool:
+def _payload_has_command_variant_menus(payload: str) -> bool:
     try:
         parsed = json.loads(payload)
     except Exception:
@@ -173,8 +177,9 @@ def _payload_has_menu_commands(payload: str) -> bool:
     while len(stack) > 0:
         current = stack.pop()
         if isinstance(current, dict):
+            command_type = str(current.get("type") or "").strip().lower()
             menu_commands = current.get("menuCommands")
-            if isinstance(menu_commands, list) and len(menu_commands) > 0:
+            if command_type == "command" and isinstance(menu_commands, list) and len(menu_commands) > 0:
                 return True
             for value in current.values():
                 if isinstance(value, (dict, list)):
@@ -6572,6 +6577,7 @@ class NativeCommandTabController:
         self._startup_repair_scheduled = False
         self._variant_menu_repair_scheduled = False
         self._variant_menu_repair_attempted = False
+        self._variant_menu_repair_attempt_count = 0
 
     def close(self) -> None:
         handle = self._handle
@@ -6581,6 +6587,7 @@ class NativeCommandTabController:
         self._startup_repair_scheduled = False
         self._variant_menu_repair_scheduled = False
         self._variant_menu_repair_attempted = False
+        self._variant_menu_repair_attempt_count = 0
 
         try:
             if self._connected_main_window is not None and self._workbench_signal_connected is True:
@@ -6682,6 +6689,7 @@ class NativeCommandTabController:
             self._loaded_workbenches = set(loaded_workbenches)
             self._full_model_loaded = full_model_loaded
             self._variant_menu_repair_attempted = False
+            self._variant_menu_repair_attempt_count = 0
             try:
                 if (
                     self._connected_main_window is not None
@@ -6732,13 +6740,14 @@ class NativeCommandTabController:
             return
         if self._handle in [None, 0]:
             return
-        if _payload_has_menu_commands(payload) is True:
+        if _payload_has_command_variant_menus(payload) is True:
             self._variant_menu_repair_attempted = True
             return
         self._variant_menu_repair_scheduled = True
         StartupTrace.mark(
             "bridge.native_controller.variant_menu_repair_scheduled",
             delayMs=int(_NATIVE_VARIANT_MENU_REPAIR_DELAY_MS),
+            attempt=self._variant_menu_repair_attempt_count + 1,
         )
         QTimer.singleShot(
             _NATIVE_VARIANT_MENU_REPAIR_DELAY_MS,
@@ -6752,28 +6761,28 @@ class NativeCommandTabController:
                 return
             if self._variant_menu_repair_attempted is True:
                 return
-            self._variant_menu_repair_attempted = True
             try:
                 _clear_runtime_payload_caches()
-                if _is_cpp_bootstrap_pipeline_enabled() is True:
-                    active_workbench, payload, loaded_workbenches, full_model_loaded = (
-                        _build_native_model_payload_safe(
-                            include_all_panels=_is_native_startup_preload_all_panels_enabled()
-                        )
+                self._variant_menu_repair_attempt_count += 1
+                active_workbench, payload, loaded_workbenches, full_model_loaded = (
+                    _build_native_model_payload_safe(
+                        include_all_panels=_is_native_startup_preload_all_panels_enabled()
                     )
-                    if _payload_has_menu_commands(payload) is True:
-                        _runtime_model_path().write_text(payload, encoding="utf-8")
-                        self._last_model_payload = payload
-                        self._last_active_workbench = active_workbench
-                        self._loaded_workbenches = set(loaded_workbenches)
-                        self._full_model_loaded = full_model_loaded
-                        self._last_bootstrap_state = {}
-                        self._reload_model_payload(payload)
-                        return
-                self.refresh(
-                    force=True,
-                    include_all_panels=_is_native_startup_preload_all_panels_enabled(),
                 )
+                _runtime_model_path().write_text(payload, encoding="utf-8")
+                self._last_model_payload = payload
+                self._last_active_workbench = active_workbench
+                self._loaded_workbenches = set(loaded_workbenches)
+                self._full_model_loaded = full_model_loaded
+                self._last_bootstrap_state = {}
+                self._reload_model_payload(payload)
+                if _payload_has_command_variant_menus(payload) is True:
+                    self._variant_menu_repair_attempted = True
+                    return
+                if self._variant_menu_repair_attempt_count >= _NATIVE_VARIANT_MENU_REPAIR_MAX_ATTEMPTS:
+                    self._variant_menu_repair_attempted = True
+                    return
+                self._schedule_variant_menu_repair_if_needed(payload)
             except Exception:
                 _logger.exception("native variant menu repair failed")
 
