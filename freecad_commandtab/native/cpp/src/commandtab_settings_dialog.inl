@@ -2582,7 +2582,23 @@ bool applyCustomizationToStructure(
 
 bool isSeparatorCommand(const QString& commandId)
 {
-    return commandId.contains(QStringLiteral("_separator_")) || commandId.endsWith(QStringLiteral("_separator"));
+    const QString normalized = commandId.trimmed().toLower();
+    if (normalized.isEmpty()) {
+        return false;
+    }
+    if (
+        normalized == QStringLiteral("0")
+        || normalized == QStringLiteral("|")
+        || normalized == QStringLiteral("-")
+        || normalized == QStringLiteral("--")
+        || normalized == QStringLiteral("---")
+        || normalized == QStringLiteral("separator")
+    ) {
+        return true;
+    }
+    return normalized.startsWith(QStringLiteral("separator_"))
+        || normalized.endsWith(QStringLiteral("_separator"))
+        || normalized.contains(QStringLiteral("_separator_"));
 }
 
 QStringList orderedToolbarIds(const QJsonObject& toolbarsObject);
@@ -4008,9 +4024,7 @@ static QSet<QString> toolbarCommandSet(const QJsonObject& panelObject)
     const auto orderArray = panelObject.value(QStringLiteral("order")).toArray();
     for (const auto& value : orderArray) {
         const QString id = value.toString().trimmed();
-        if (!id.isEmpty()
-            && !id.contains(QStringLiteral("_separator_"))
-            && !id.endsWith(QStringLiteral("_separator"))) {
+        if (!id.isEmpty() && !isSeparatorCommand(id)) {
             result.insert(id);
         }
     }
@@ -4021,9 +4035,7 @@ static QSet<QString> toolbarCommandSet(const QJsonObject& panelObject)
     const auto commandsObj = panelObject.value(QStringLiteral("commands")).toObject();
     for (auto it = commandsObj.begin(); it != commandsObj.end(); ++it) {
         const QString id = it.key().trimmed();
-        if (!id.isEmpty()
-            && !id.contains(QStringLiteral("_separator_"))
-            && !id.endsWith(QStringLiteral("_separator"))) {
+        if (!id.isEmpty() && !isSeparatorCommand(id)) {
             result.insert(id);
         }
     }
@@ -4036,9 +4048,7 @@ static int toolbarCommandPayloadCount(const QJsonObject& panelObject)
     const auto commandsObj = panelObject.value(QStringLiteral("commands")).toObject();
     for (auto it = commandsObj.begin(); it != commandsObj.end(); ++it) {
         const QString id = it.key().trimmed();
-        if (!id.isEmpty()
-            && !id.contains(QStringLiteral("_separator_"))
-            && !id.endsWith(QStringLiteral("_separator"))) {
+        if (!id.isEmpty() && !isSeparatorCommand(id)) {
             ++count;
         }
     }

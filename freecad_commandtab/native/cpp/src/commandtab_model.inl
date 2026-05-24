@@ -1000,6 +1000,27 @@ QString nativeHeaderLogoResource(const CommandTabModel::CommandTabTheme& theme)
         : QStringLiteral(":/theme/light/more_arrow");
 }
 
+bool looksLikeSeparatorCommandId(const QString& commandId)
+{
+    const QString normalized = commandId.trimmed().toLower();
+    if (normalized.isEmpty()) {
+        return false;
+    }
+    if (
+        normalized == QStringLiteral("0")
+        || normalized == QStringLiteral("|")
+        || normalized == QStringLiteral("-")
+        || normalized == QStringLiteral("--")
+        || normalized == QStringLiteral("---")
+        || normalized == QStringLiteral("separator")
+    ) {
+        return true;
+    }
+    return normalized.startsWith(QStringLiteral("separator_"))
+        || normalized.endsWith(QStringLiteral("_separator"))
+        || normalized.contains(QStringLiteral("_separator_"));
+}
+
 CommandTabCommandEntry parseCommand(const QJsonObject& object)
 {
     CommandTabCommandEntry command;
@@ -1009,6 +1030,20 @@ CommandTabCommandEntry parseCommand(const QJsonObject& object)
     command.iconPath = object.value(QStringLiteral("iconPath")).toString();
     command.shortcut = object.value(QStringLiteral("shortcut")).toString();
     command.size = object.value(QStringLiteral("size")).toString(QStringLiteral("small"));
+    const QString normalizedSize = command.size.trimmed().toLower();
+    if (
+        normalizedSize != QStringLiteral("small")
+        && normalizedSize != QStringLiteral("medium")
+        && normalizedSize != QStringLiteral("large")
+    ) {
+        command.size = QStringLiteral("small");
+    } else {
+        command.size = normalizedSize;
+    }
+    if (looksLikeSeparatorCommandId(command.id)) {
+        command.type = QStringLiteral("separator");
+        command.size = QStringLiteral("small");
+    }
     command.textVisible = object.value(QStringLiteral("textVisible")).toBool(true);
     if (object.contains(QStringLiteral("textVisibilityExplicit"))) {
         command.textVisibilityExplicit =

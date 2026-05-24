@@ -4555,6 +4555,49 @@ def _panel_title_from_identifier(panel_id: str, suffix: str = "") -> str:
     return title.replace("_", " ").strip() or panel_id
 
 
+def _normalized_display_text_for_lookup(value: str) -> str:
+    text = str(value or "").replace("&", " ").strip().lower()
+    if text == "":
+        return ""
+    text = re.sub(r"[_\-]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _resolve_panel_command_identifier(command_name: str, command_map: dict) -> str:
+    candidate = str(command_name or "").strip()
+    if candidate == "":
+        return ""
+    if _is_separator_command_id(candidate):
+        return candidate
+    if candidate in command_map:
+        return candidate
+
+    lowered_candidate = candidate.lower()
+    by_lowered_key = {
+        str(key).strip().lower(): str(key)
+        for key in command_map.keys()
+        if str(key).strip() != ""
+    }
+    if lowered_candidate in by_lowered_key:
+        return by_lowered_key[lowered_candidate]
+
+    lookup_token = _normalized_display_text_for_lookup(candidate)
+    if lookup_token == "":
+        return candidate
+
+    text_matches = []
+    for map_key, map_value in command_map.items():
+        if not isinstance(map_value, dict):
+            continue
+        display_text = _normalized_display_text_for_lookup(str(map_value.get("text") or ""))
+        if display_text == lookup_token:
+            text_matches.append(str(map_key))
+    if len(text_matches) == 1:
+        return text_matches[0]
+    return candidate
+
+
 def _build_panel_command_entries(
     structure: dict,
     command_order: list,
@@ -4569,7 +4612,10 @@ def _build_panel_command_entries(
     commands = []
     seen_command_names: set[str] = set()
     for command_name in command_order:
-        command_name = str(command_name or "")
+        command_name = _resolve_panel_command_identifier(
+            str(command_name or ""),
+            command_map,
+        )
         if command_name == "":
             continue
         if _is_separator_command_id(command_name) is False:
