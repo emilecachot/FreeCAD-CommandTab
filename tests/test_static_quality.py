@@ -152,6 +152,9 @@ def test_native_dropdown_commands_use_split_button_behavior() -> None:
     assert 'os.environ.get("FREECAD_COMMANDTAB_CPP_BOOTSTRAP_PIPELINE", "0")' in bridge_text
     assert "def _enrich_native_payload_menu_commands" in bridge_text
     assert "_enrich_native_payload_menu_commands(parsed_payload)" in bridge_text
+    assert "def _persistent_variant_menu_cache_path() -> Path:" in bridge_text
+    assert "def _cached_variant_menu_entries(command_name: str) -> list[dict]:" in bridge_text
+    assert "_write_variant_menu_cache_entry(command_name, entries)" in bridge_text
     assert "dropdownHotZoneRect().contains(event->pos())" in widget_text
     assert 'setProperty("commandtabHasMenuCommands", !m_menuCommands.isEmpty())' in widget_text
     assert 'setProperty("commandtabMenuCommandCount", m_menuCommands.size())' in widget_text
@@ -276,8 +279,12 @@ def test_startup_variant_menu_repair_is_enabled() -> None:
         encoding="utf-8"
     )
     assert "_NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 2" in bridge_text
+    assert "_NATIVE_VARIANT_MENU_CACHE_VERSION = 1" in bridge_text
+    assert "_NATIVE_METADATA_CACHE_VERSION = 36" in bridge_text
     assert "def _payload_has_command_variant_menus(payload: str) -> bool:" in bridge_text
     assert 'command_type == "command"' in bridge_text
+    assert "CommandTabVariantMenus.json" in bridge_text
+    assert "return _cached_variant_menu_entries(command_name)" in bridge_text
     assert "def _schedule_variant_menu_repair_if_needed(self, payload: str) -> None:" in bridge_text
     assert "def _run_variant_menu_repair(self) -> None:" in bridge_text
     assert "self._schedule_variant_menu_repair_if_needed(payload)" in bridge_text

@@ -74,6 +74,7 @@ _MODEL_PAYLOAD_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, boo
 _BOOTSTRAP_PAYLOAD_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, bool, str], str] = {}
 _WORKBENCH_BOOTSTRAP_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, str], str] = {}
 _WORKBENCH_BOOTSTRAP_STATE_CACHE: dict[str, dict[str, object]] = {}
+_VARIANT_MENU_CACHE_MEMORY: dict[str, object] = {}
 _WORKBENCH_PRELOAD_IN_PROGRESS = False
 _WORKBENCH_PRELOAD_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PRELOAD_WORKBENCHES", "0") or "0"
@@ -126,8 +127,9 @@ _NATIVE_METADATA_SCOPE_ALL_WORKBENCH_ICONS = str(
 _NATIVE_PERSISTENT_METADATA_BOOTSTRAP_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PERSISTENT_METADATA_BOOTSTRAP", "0") or "0"
 ).strip().lower() in {"1", "true", "yes", "on"}
-_NATIVE_METADATA_CACHE_VERSION = 35
+_NATIVE_METADATA_CACHE_VERSION = 36
 _NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 2
+_NATIVE_VARIANT_MENU_CACHE_VERSION = 1
 _AVAILABLE_WORKBENCHES_CACHE_TTL_S = 0.45
 _NATIVE_VARIANT_MENU_REPAIR_DELAY_MS = int(
     os.environ.get("FREECAD_COMMANDTAB_VARIANT_MENU_REPAIR_DELAY_MS", "900") or "900"
@@ -1541,6 +1543,12 @@ def _runtime_metadata_cache_path() -> Path:
     return _runtime_root() / "metadata-cache.json"
 
 
+def _persistent_variant_menu_cache_path() -> Path:
+    path = Path(paths.user_cache_path("CommandTabVariantMenus.json"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def _runtime_structure_metadata_export_path() -> Path:
     return _runtime_root() / "structure-metadata-export.json"
 
@@ -2788,6 +2796,20 @@ def _runtime_action_icon_path(action_ref: str, icon_cache_key: str = "") -> Path
     return _runtime_icons_dir() / f"{safe_name[:96]}_{digest[:12]}.png"
 
 
+def _persistent_action_icon_path(action_ref: str, icon_cache_key: str = "") -> Path:
+    theme_signature = "|".join(_native_theme_signature())
+    digest = hashlib.sha1(
+        (
+            f"{action_ref}|{icon_cache_key}|{theme_signature}"
+            f"|metadata-v{_NATIVE_METADATA_CACHE_VERSION}|native-action-icon-export-persistent-v1"
+        ).encode()
+    ).hexdigest()
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(action_ref or "action")).strip("_")
+    if safe_name == "":
+        safe_name = "action"
+    return _persistent_icon_export_dir() / f"{safe_name[:96]}_{digest[:12]}.png"
+
+
 def _persistent_icon_path(
     command_name: str, icon_hint: str = "", theme_signature: str = ""
 ) -> Path:
@@ -3168,7 +3190,7 @@ def _trigger_encoded_command_action(encoded_payload: str) -> bool:
         return False
 
 
-def _export_action_icon(action_ref: str, action) -> str:
+def _export_action_icon(action_ref: str, action, persistent: bool = True) -> str:
     if action is None:
         return ""
     try:
@@ -3182,7 +3204,11 @@ def _export_action_icon(action_ref: str, action) -> str:
         icon_cache_key = str(int(icon.cacheKey()))
     except Exception:
         icon_cache_key = action_ref
-    output_path = _runtime_action_icon_path(action_ref, icon_cache_key)
+    output_path = (
+        _persistent_action_icon_path(action_ref, icon_cache_key)
+        if persistent
+        else _runtime_action_icon_path(action_ref, icon_cache_key)
+    )
     if output_path.exists():
         return str(output_path)
 
@@ -3307,9 +3333,9 @@ def _command_subaction_entries(command_name: str, command_data: dict) -> list[di
         command = Gui.Command.get(command_name)
         actions = list(command.getAction()) if command is not None else []
     except Exception:
-        return []
+        return _cached_variant_menu_entries(command_name)
     if len(actions) == 0:
-        return []
+        return _cached_variant_menu_entries(command_name)
 
     entries: list[dict] = []
     seen_ids: set[str] = {command_name}
@@ -3337,7 +3363,10 @@ def _command_subaction_entries(command_name: str, command_data: dict) -> list[di
             seen_ids,
             "toolbarMenu",
         )
-    return entries
+    if entries:
+        _write_variant_menu_cache_entry(command_name, entries)
+        return entries
+    return _cached_variant_menu_entries(command_name)
 
 
 def _command_subaction_signature(menu_commands: list[dict]) -> tuple[tuple[str, str], ...]:
@@ -3345,6 +3374,120 @@ def _command_subaction_signature(menu_commands: list[dict]) -> tuple[tuple[str, 
     for command in menu_commands:
         signature.append((str(command.get("id") or ""), str(command.get("text") or "")))
     return tuple(signature)
+
+
+def _variant_menu_cache_key() -> dict[str, object]:
+    return {
+        "cacheVersion": _NATIVE_VARIANT_MENU_CACHE_VERSION,
+        "metadataCacheVersion": _NATIVE_METADATA_CACHE_VERSION,
+        "environmentSignature": _native_metadata_environment_signature(),
+        "themeSignature": list(_native_theme_signature()),
+    }
+
+
+def _read_variant_menu_cache() -> dict[str, list[dict]]:
+    expected_key = _variant_menu_cache_key()
+    if _coerce_dict(_VARIANT_MENU_CACHE_MEMORY.get("key")) == expected_key:
+        return copy.deepcopy(_coerce_dict(_VARIANT_MENU_CACHE_MEMORY.get("commands")))
+
+    cache_path = _persistent_variant_menu_cache_path()
+    if cache_path.exists() is False:
+        return {}
+    try:
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if isinstance(payload, dict) is False:
+        return {}
+    if _coerce_dict(payload.get("key")) != expected_key:
+        return {}
+    commands = _coerce_dict(payload.get("commands"))
+    result: dict[str, list[dict]] = {}
+    for command_name, entries in commands.items():
+        normalized_name = str(command_name or "").strip()
+        if normalized_name == "" or isinstance(entries, list) is False:
+            continue
+        clean_entries = []
+        for entry in entries:
+            entry_object = _coerce_dict(entry)
+            entry_id = str(entry_object.get("id") or "").strip()
+            if entry_id == "":
+                continue
+            entry_object["type"] = str(entry_object.get("type") or "command")
+            entry_object["id"] = entry_id
+            clean_entries.append(entry_object)
+        if clean_entries:
+            result[normalized_name] = clean_entries
+    _VARIANT_MENU_CACHE_MEMORY["key"] = expected_key
+    _VARIANT_MENU_CACHE_MEMORY["commands"] = copy.deepcopy(result)
+    return result
+
+
+def _cached_variant_menu_entries(command_name: str) -> list[dict]:
+    normalized_name = str(command_name or "").strip()
+    if normalized_name == "":
+        return []
+    entries = _read_variant_menu_cache().get(normalized_name, [])
+    if not entries:
+        return []
+    return copy.deepcopy(entries)
+
+
+def _write_variant_menu_cache_entry(command_name: str, entries: list[dict]) -> None:
+    normalized_name = str(command_name or "").strip()
+    if normalized_name == "" or not entries:
+        return
+    clean_entries = []
+    for entry in entries:
+        entry_object = _coerce_dict(entry)
+        entry_id = str(entry_object.get("id") or "").strip()
+        if entry_id == "":
+            continue
+        clean_entry = {
+            "type": str(entry_object.get("type") or "command"),
+            "id": entry_id,
+            "text": str(entry_object.get("text") or entry_id),
+            "size": str(entry_object.get("size") or "small"),
+            "textVisible": bool(entry_object.get("textVisible", True)),
+            "iconPath": str(entry_object.get("iconPath") or ""),
+            "sourceWorkbenchId": str(entry_object.get("sourceWorkbenchId") or ""),
+            "sourceToolbarTitle": str(entry_object.get("sourceToolbarTitle") or ""),
+        }
+        shortcut = str(entry_object.get("shortcut") or "").strip()
+        if shortcut != "":
+            clean_entry["shortcut"] = shortcut
+        nested_entries = _coerce_list(entry_object.get("menuCommands", []))
+        if nested_entries:
+            clean_entry["menuCommands"] = copy.deepcopy(nested_entries)
+        clean_entries.append(clean_entry)
+    if not clean_entries:
+        return
+
+    cache_path = _persistent_variant_menu_cache_path()
+    key = _variant_menu_cache_key()
+    current_commands = _read_variant_menu_cache()
+    current_commands[normalized_name] = clean_entries
+    _VARIANT_MENU_CACHE_MEMORY["key"] = key
+    _VARIANT_MENU_CACHE_MEMORY["commands"] = copy.deepcopy(current_commands)
+    tmp_path = cache_path.with_suffix(".tmp")
+    try:
+        tmp_path.write_text(
+            json.dumps(
+                {
+                    "key": key,
+                    "commands": current_commands,
+                },
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
+        )
+        tmp_path.replace(cache_path)
+    except Exception:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def _resolve_structure_path() -> Path:
@@ -4565,6 +4708,8 @@ def _enrich_native_payload_menu_commands(payload: dict) -> dict:
             if menu_commands:
                 command["menuCommands"] = menu_commands
                 existing_menu_commands = menu_commands
+        elif str(command.get("type") or "").strip().lower() == "command":
+            _write_variant_menu_cache_entry(command_id, existing_menu_commands)
         for menu_command in existing_menu_commands:
             if isinstance(menu_command, dict):
                 _enrich_command(menu_command)
