@@ -127,8 +127,11 @@ _NATIVE_PERSISTENT_METADATA_BOOTSTRAP_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PERSISTENT_METADATA_BOOTSTRAP", "0") or "0"
 ).strip().lower() in {"1", "true", "yes", "on"}
 _NATIVE_METADATA_CACHE_VERSION = 35
-_NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 1
+_NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 2
 _AVAILABLE_WORKBENCHES_CACHE_TTL_S = 0.45
+_NATIVE_VARIANT_MENU_REPAIR_DELAY_MS = int(
+    os.environ.get("FREECAD_COMMANDTAB_VARIANT_MENU_REPAIR_DELAY_MS", "900") or "900"
+)
 _MAIN_WINDOW_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/MainWindow")
 _COMMANDTAB_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab")
 _GENERAL_PREFERENCES = App.ParamGet("User parameter:BaseApp/Preferences/General")
@@ -155,6 +158,32 @@ def _coerce_dict(value) -> dict:
 
 def _coerce_list(value) -> list:
     return list(value) if isinstance(value, list) else []
+
+
+def _payload_has_menu_commands(payload: str) -> bool:
+    try:
+        parsed = json.loads(payload)
+    except Exception:
+        return False
+
+    if isinstance(parsed, dict) is False:
+        return False
+
+    stack = [parsed]
+    while len(stack) > 0:
+        current = stack.pop()
+        if isinstance(current, dict):
+            menu_commands = current.get("menuCommands")
+            if isinstance(menu_commands, list) and len(menu_commands) > 0:
+                return True
+            for value in current.values():
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
+        elif isinstance(current, list):
+            for value in current:
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
+    return False
 
 
 def _is_separator_command_id(command_name: str) -> bool:
@@ -6533,6 +6562,8 @@ class NativeCommandTabController:
         self._warmup_queue: list[str] = []
         self._last_bootstrap_state: dict[str, object] = {}
         self._startup_repair_scheduled = False
+        self._variant_menu_repair_scheduled = False
+        self._variant_menu_repair_attempted = False
 
     def close(self) -> None:
         handle = self._handle
@@ -6540,6 +6571,8 @@ class NativeCommandTabController:
         self._warmup_queue = []
         self._warmup_scheduled = False
         self._startup_repair_scheduled = False
+        self._variant_menu_repair_scheduled = False
+        self._variant_menu_repair_attempted = False
 
         try:
             if self._connected_main_window is not None and self._workbench_signal_connected is True:
@@ -6640,6 +6673,7 @@ class NativeCommandTabController:
             self._last_active_workbench = active_workbench
             self._loaded_workbenches = set(loaded_workbenches)
             self._full_model_loaded = full_model_loaded
+            self._variant_menu_repair_attempted = False
             try:
                 if (
                     self._connected_main_window is not None
@@ -6661,6 +6695,7 @@ class NativeCommandTabController:
                 self._workbench_signal_connected = False
                 pass
             self._schedule_warmup()
+            self._schedule_variant_menu_repair_if_needed(payload)
             if _NATIVE_STARTUP_REPAIR_ENABLED is True:
                 self._schedule_startup_repair()
             StartupTrace.mark(
@@ -6681,6 +6716,42 @@ class NativeCommandTabController:
             delayMs=int(_NATIVE_STARTUP_REPAIR_DELAY_MS),
         )
         QTimer.singleShot(_NATIVE_STARTUP_REPAIR_DELAY_MS, self._run_startup_repair)
+
+    def _schedule_variant_menu_repair_if_needed(self, payload: str) -> None:
+        if self._variant_menu_repair_attempted is True:
+            return
+        if self._variant_menu_repair_scheduled is True:
+            return
+        if self._handle in [None, 0]:
+            return
+        if _payload_has_menu_commands(payload) is True:
+            self._variant_menu_repair_attempted = True
+            return
+        self._variant_menu_repair_scheduled = True
+        StartupTrace.mark(
+            "bridge.native_controller.variant_menu_repair_scheduled",
+            delayMs=int(_NATIVE_VARIANT_MENU_REPAIR_DELAY_MS),
+        )
+        QTimer.singleShot(
+            _NATIVE_VARIANT_MENU_REPAIR_DELAY_MS,
+            self._run_variant_menu_repair,
+        )
+
+    def _run_variant_menu_repair(self) -> None:
+        with StartupTrace.span("bridge.native_controller.variant_menu_repair"):
+            self._variant_menu_repair_scheduled = False
+            if self._handle in [None, 0]:
+                return
+            if self._variant_menu_repair_attempted is True:
+                return
+            self._variant_menu_repair_attempted = True
+            try:
+                self.refresh(
+                    force=True,
+                    include_all_panels=_is_native_startup_preload_all_panels_enabled(),
+                )
+            except Exception:
+                _logger.exception("native variant menu repair failed")
 
     def _run_startup_repair(self) -> None:
         with StartupTrace.span("bridge.native_controller.startup_repair"):

@@ -269,3 +269,14 @@ def test_panel_command_identifier_resolution_is_shared() -> None:
     assert "if candidate in command_map:" in bridge_text
     assert "text_matches = []" in bridge_text
     assert "command_name = _resolve_panel_command_identifier(" in bridge_text
+
+
+def test_startup_variant_menu_repair_is_enabled() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    assert "_NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 2" in bridge_text
+    assert "def _payload_has_menu_commands(payload: str) -> bool:" in bridge_text
+    assert "def _schedule_variant_menu_repair_if_needed(self, payload: str) -> None:" in bridge_text
+    assert "def _run_variant_menu_repair(self) -> None:" in bridge_text
+    assert "self._schedule_variant_menu_repair_if_needed(payload)" in bridge_text
