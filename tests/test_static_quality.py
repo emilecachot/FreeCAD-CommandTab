@@ -188,6 +188,8 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "m_checkedButtonsByCommandId" in shell_text
     assert "m_commandStatePollTimer->setInterval(2000)" in shell_text
     assert "refreshCommandStatesAfterWorkbenchChange()" in shell_text
+    assert "scheduleCommandStatesAfterWorkbenchChange" in shell_text
+    assert "scheduleWorkbenchActivation(index)" in shell_text
     assert "scheduleCommandStateRefresh(0, 3)" in shell_text
 
 
@@ -348,8 +350,9 @@ def test_native_background_preload_yields_to_ribbon_interaction() -> None:
     assert "isRibbonEventTarget(watched)" in shell_text
     assert "shouldYieldBackgroundRibbonWork" in shell_text
     assert "ensureWorkbenchPage(index, 100000, false)" not in shell_text
+    assert "ensureWorkbenchPage(index, 2, true)" in shell_text
     assert "const int budget = 8" in shell_text
-    assert "buildWorkbenchPageChunk(index, currentPage ? 5 : 2)" in shell_text
+    assert "const int budget = currentPage && !shouldYieldBackgroundRibbonWork(80) ? 5 : 2" in shell_text
     assert "QTimer::singleShot(std::clamp(delayMs, 30, 1200)" in shell_text
 
 

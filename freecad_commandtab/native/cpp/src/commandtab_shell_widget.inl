@@ -150,7 +150,7 @@ public:
                 !m_workbenchEntries.at(index).panels.isEmpty();
             if (targetHasPanels) {
                 if (!m_settingsState.tabClickPopupMode) {
-                    ensureWorkbenchPage(index);
+                    ensureWorkbenchPage(index, 2, true);
                     m_stack->setCurrentIndex(index);
                 } else if (!m_ribbonCollapsed) {
                     setRibbonCollapsed(true, true);
@@ -166,10 +166,7 @@ public:
             if (m_loadingModel || index < 0 || index >= m_workbenchIds.size()) {
                 return;
             }
-            if (m_commandHandler) {
-                m_commandHandler(QStringLiteral("__workbench__:%1").arg(m_workbenchIds.at(index)));
-                refreshCommandStatesAfterWorkbenchChange();
-            }
+            scheduleWorkbenchActivation(index);
         });
 
         connect(m_tabBar, &QTabBar::tabBarClicked, this, [this](int index) {
@@ -1318,6 +1315,35 @@ private:
         requestActionLookupRefresh();
         refreshCommandStatesFromActions();
         scheduleCommandStateRefresh(0, 3);
+    }
+
+    void scheduleCommandStatesAfterWorkbenchChange(int delayMs = 0)
+    {
+        requestActionLookupRefresh();
+        scheduleCommandStateRefresh(delayMs, 3);
+    }
+
+    void scheduleWorkbenchActivation(int index)
+    {
+        if (m_loadingModel || index < 0 || index >= m_workbenchIds.size()) {
+            return;
+        }
+        const int serial = ++m_pendingWorkbenchActivationSerial;
+        m_pendingWorkbenchActivationIndex = index;
+        QTimer::singleShot(1, this, [this, index, serial]() {
+            if (
+                serial != m_pendingWorkbenchActivationSerial
+                || index != m_pendingWorkbenchActivationIndex
+                || index < 0
+                || index >= m_workbenchIds.size()
+            ) {
+                return;
+            }
+            if (m_commandHandler) {
+                m_commandHandler(QStringLiteral("__workbench__:%1").arg(m_workbenchIds.at(index)));
+            }
+            scheduleCommandStatesAfterWorkbenchChange(0);
+        });
     }
 
     void scheduleCommandIconRefresh(int delayMs = 220, int passes = 1)
@@ -2612,7 +2638,7 @@ QWidget#CommandTabWorkbenchViewport {
         }
         if (deferInitialChunk) {
             const int clampedBudget = std::max(1, initialPanelBudget);
-            QTimer::singleShot(0, this, [this, index, clampedBudget]() {
+            QTimer::singleShot(1, this, [this, index, clampedBudget]() {
                 buildWorkbenchPageChunk(index, clampedBudget);
             });
         } else {
@@ -2943,7 +2969,8 @@ QWidget#CommandTabWorkbenchViewport {
 
         pageState.chunkScheduled = true;
         const bool currentPage = (m_stack != nullptr && m_stack->currentIndex() == index);
-        const int delayMs = currentPage ? 0 : 28;
+        const bool recentInteraction = shouldYieldBackgroundRibbonWork(80);
+        const int delayMs = currentPage ? (recentInteraction ? 12 : 0) : 28;
         QTimer::singleShot(delayMs, this, [this, index]() {
             if (index < 0 || index >= m_pageBuildStates.size()) {
                 return;
@@ -2954,7 +2981,8 @@ QWidget#CommandTabWorkbenchViewport {
                 scheduleWorkbenchPageChunk(index);
                 return;
             }
-            buildWorkbenchPageChunk(index, currentPage ? 5 : 2);
+            const int budget = currentPage && !shouldYieldBackgroundRibbonWork(80) ? 5 : 2;
+            buildWorkbenchPageChunk(index, budget);
         });
     }
 
@@ -3009,7 +3037,7 @@ QWidget#CommandTabWorkbenchViewport {
         }
         if (finished) {
             if (m_stack != nullptr && m_stack->currentIndex() == index) {
-                refreshCommandStatesAfterWorkbenchChange();
+                scheduleCommandStatesAfterWorkbenchChange(0);
             }
             scheduleBackgroundPageWarmup();
         }
@@ -4827,6 +4855,8 @@ private:
     QTimer* m_commandStatePollTimer = nullptr;
     int m_pendingCommandIconRefreshPasses = 0;
     int m_pendingCommandStateRefreshPasses = 0;
+    int m_pendingWorkbenchActivationSerial = 0;
+    int m_pendingWorkbenchActivationIndex = -1;
     int m_hoverTabPending = -1;
     bool m_ribbonCollapsed = false;
     bool m_updatingTabScrollButtonLayout = false;
