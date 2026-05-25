@@ -4,7 +4,12 @@ FreeCAD CommandTab is a native-first ribbon UI addon for FreeCAD.
 
 - UI shell, layout and dialogs are implemented in native Qt/C++ (`freecad_commandtab/native/cpp`)
 - Python is kept for FreeCAD addon bootstrap (`InitGui.py`) and bridge/orchestration only
-- Legacy Python ribbon UI modules were removed from this codebase
+
+<p align="center">
+  <img src="docs/image/commandtab.png"
+       alt="FreeCAD CommandTab ribbon interface"
+       width="100%">
+</p>
 
 Current project status and macOS handover notes are tracked in
 [`PROJECT_STATUS.md`](./PROJECT_STATUS.md).
