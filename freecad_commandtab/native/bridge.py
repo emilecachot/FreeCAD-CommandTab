@@ -1141,6 +1141,7 @@ def _native_settings_state_json() -> str:
             ),
             "compactPanelSpacing": _int_setting("NativeCompactPanelSpacing", 1, 0, 6),
             "compactButtonPadding": _int_setting("NativeCompactButtonPadding", 3, 1, 8),
+            "buttonBordersVisible": _bool_setting("NativeButtonBordersVisible", True),
             "showIconTextSmall": bool(getattr(Parameters_CommandTab, "SHOW_ICON_TEXT_SMALL", True)),
             "showIconTextMedium": bool(getattr(Parameters_CommandTab, "SHOW_ICON_TEXT_MEDIUM", True)),
             "showIconTextLarge": bool(getattr(Parameters_CommandTab, "SHOW_ICON_TEXT_LARGE", True)),
@@ -1431,6 +1432,7 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     panel_dropdown_popup_show_text = bool(payload.get("panelDropdownPopupShowText", False))
     compact_panel_spacing = _clamped_int(payload.get("compactPanelSpacing", 1), 1, 0, 6)
     compact_button_padding = _clamped_int(payload.get("compactButtonPadding", 3), 3, 1, 8)
+    button_borders_visible = bool(payload.get("buttonBordersVisible", True))
     show_icon_text_small = bool(payload.get("showIconTextSmall", True))
     show_icon_text_medium = bool(payload.get("showIconTextMedium", True))
     show_icon_text_large = bool(payload.get("showIconTextLarge", True))
@@ -1501,6 +1503,7 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     )
     Parameters_CommandTab.Settings.SetIntSetting("NativeCompactPanelSpacing", compact_panel_spacing)
     Parameters_CommandTab.Settings.SetIntSetting("NativeCompactButtonPadding", compact_button_padding)
+    Parameters_CommandTab.Settings.SetBoolSetting("NativeButtonBordersVisible", button_borders_visible)
     Parameters_CommandTab.Settings.SetBoolSetting("ShowIconText_Small", show_icon_text_small)
     Parameters_CommandTab.Settings.SetBoolSetting("ShowIconText_Medium", show_icon_text_medium)
     Parameters_CommandTab.Settings.SetBoolSetting("ShowIconText_Large", show_icon_text_large)
@@ -1555,6 +1558,7 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     Parameters_CommandTab.NATIVE_PANEL_DROPDOWN_POPUP_SHOW_TEXT = panel_dropdown_popup_show_text
     Parameters_CommandTab.NATIVE_COMPACT_PANEL_SPACING = compact_panel_spacing
     Parameters_CommandTab.NATIVE_COMPACT_BUTTON_PADDING = compact_button_padding
+    Parameters_CommandTab.NATIVE_BUTTON_BORDERS_VISIBLE = button_borders_visible
     Parameters_CommandTab.SHOW_ICON_TEXT_SMALL = show_icon_text_small
     Parameters_CommandTab.SHOW_ICON_TEXT_MEDIUM = show_icon_text_medium
     Parameters_CommandTab.SHOW_ICON_TEXT_LARGE = show_icon_text_large

@@ -197,6 +197,7 @@ class Settings:
         Settings.SetBoolSetting("UseToolsPanel", USE_TOOLSPANEL)
         Settings.SetBoolSetting("UseFCOverlay", USE_FC_OVERLAY)
         Settings.SetBoolSetting("UseButtonBackGround", BUTTON_BACKGROUND_ENABLED)
+        Settings.SetBoolSetting("NativeButtonBordersVisible", NATIVE_BUTTON_BORDERS_VISIBLE)
 
         Settings.SetBoolSetting("DebugMode", DEBUG_MODE)
 
@@ -281,6 +282,7 @@ DefaultSettings = {
     "UseOverlay": True,
     "UseFCOverlay": False,
     "UseButtonBackGround": False,
+    "NativeButtonBordersVisible": True,
     "CustomColors": False,
     "BorderTransparant": True,
     "Color_Borders": "",
@@ -804,6 +806,11 @@ BUTTON_BACKGROUND_ENABLED = Settings.GetBoolSetting("UseButtonBackGround")
 if Settings.GetBoolSetting("UseButtonBackGround") is None:
     BUTTON_BACKGROUND_ENABLED = bool(DefaultSettings["UseButtonBackGround"])
     Settings.SetBoolSetting("UseButtonBackGround", BUTTON_BACKGROUND_ENABLED)
+
+NATIVE_BUTTON_BORDERS_VISIBLE = Settings.GetBoolSetting("NativeButtonBordersVisible")
+if Settings.GetBoolSetting("NativeButtonBordersVisible") is None:
+    NATIVE_BUTTON_BORDERS_VISIBLE = bool(DefaultSettings["NativeButtonBordersVisible"])
+    Settings.SetBoolSetting("NativeButtonBordersVisible", NATIVE_BUTTON_BORDERS_VISIBLE)
 # endregion ------------------------------------------------------------------------------------------------------------
 
 # region - Color and icon settings -------------------------------------------------------------------------------------

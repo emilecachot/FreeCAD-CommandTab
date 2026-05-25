@@ -248,6 +248,54 @@ QIcon genericCommandFallbackIcon(const QString& label = QString())
     return icon;
 }
 
+bool isGridToggleCommandId(const QString& commandId)
+{
+    const QString normalized = commandId.trimmed().toLower();
+    return normalized == QStringLiteral("__commandtab_toggle_grid__")
+        || normalized == QStringLiteral("draft_togglegrid")
+        || normalized == QStringLiteral("sketcher_grid");
+}
+
+QIcon gridToggleFallbackIcon()
+{
+    static QIcon cachedGridIcon;
+    static bool resolved = false;
+    if (resolved) {
+        return cachedGridIcon;
+    }
+    resolved = true;
+
+    for (const auto& candidate : {
+             QStringLiteral("Sketcher_GridToggle_Deactivated.svg"),
+             QStringLiteral("Draft_ToggleGrid"),
+             QStringLiteral("Sketcher_Grid"),
+             QStringLiteral("view-grid"),
+         }) {
+        const QIcon icon = loadIconFromSource(candidate);
+        if (!icon.isNull()) {
+            cachedGridIcon = icon;
+            return cachedGridIcon;
+        }
+    }
+
+    QPixmap pixmap(36, 36);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(QColor(QStringLiteral("#d7e3f0")), 1.2));
+    painter.setBrush(QColor(QStringLiteral("#2f3a47")));
+    painter.drawRoundedRect(QRectF(4.5, 4.5, 27.0, 27.0), 6.0, 6.0);
+    painter.setPen(QPen(QColor(QStringLiteral("#8fa6bd")), 1.0));
+    for (int offset : {12, 18, 24}) {
+        painter.drawLine(QPointF(offset, 7.5), QPointF(offset, 28.5));
+        painter.drawLine(QPointF(7.5, offset), QPointF(28.5, offset));
+    }
+    painter.setPen(QPen(QColor(QStringLiteral("#f4c95d")), 1.6));
+    painter.drawLine(QPointF(9.5, 26.5), QPointF(26.5, 9.5));
+    cachedGridIcon.addPixmap(pixmap);
+    return cachedGridIcon;
+}
+
 QString commandIconCacheKey(const CommandTabCommandEntry& command)
 {
     QStringList menuIds;
@@ -275,6 +323,14 @@ QIcon loadCommandEntryIcon(const CommandTabCommandEntry& command)
     }
 
     const QString explicitIconPath = command.iconPath.trimmed();
+    if (isGridToggleCommandId(command.id)) {
+        const QIcon gridIcon = gridToggleFallbackIcon();
+        if (!gridIcon.isNull()) {
+            g_commandIconCache.insert(cacheKey, gridIcon);
+            return gridIcon;
+        }
+    }
+
     if (!explicitIconPath.isEmpty()) {
         const QIcon directIcon = loadIconFromSource(explicitIconPath);
         if (!directIcon.isNull()) {

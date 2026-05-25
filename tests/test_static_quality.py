@@ -187,6 +187,8 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "m_enabledWidgetsByCommandId" in shell_text
     assert "m_checkedButtonsByCommandId" in shell_text
     assert "m_commandStatePollTimer->setInterval(2000)" in shell_text
+    assert "refreshCommandStatesAfterWorkbenchChange()" in shell_text
+    assert "scheduleCommandStateRefresh(0, 3)" in shell_text
 
 
 def test_build_script_uses_release_config_by_default() -> None:
@@ -282,12 +284,17 @@ def test_ribbon_surface_settings_contract_present() -> None:
 
     assert "RibbonSurfaceStyle" in bridge_text
     assert "RibbonSurfaceTransparent" in bridge_text
+    assert "NativeButtonBordersVisible" in bridge_text
     assert "ribbonSurfaceStyle" in model_text
     assert "ribbonSurfaceTransparent" in model_text
+    assert "buttonBordersVisible" in model_text
     assert "Ribbon surface" in dialog_text
     assert "Use transparent ribbon surfaces" in dialog_text
+    assert "Show button outlines" in dialog_text
     assert "surfaceStyleChanged" in shell_text
+    assert "buttonBordersChanged" in shell_text
     assert "m_surfaceStyle" in widget_text
+    assert "m_buttonBordersVisible" in widget_text
 
 
 def test_part_design_sketch_compound_label_is_corrected() -> None:
@@ -424,6 +431,25 @@ def test_panel_command_identifier_resolution_is_shared() -> None:
     assert "if candidate in command_map:" in bridge_text
     assert "text_matches = []" in bridge_text
     assert "command_name = _resolve_panel_command_identifier(" in bridge_text
+
+
+def test_grid_buttons_use_stable_native_icon() -> None:
+    icon_cache_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_icon_cache.inl"
+    ).read_text(encoding="utf-8")
+    shell_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl"
+    ).read_text(encoding="utf-8")
+    widget_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_widgets.inl"
+    ).read_text(encoding="utf-8")
+
+    assert "bool isGridToggleCommandId(const QString& commandId)" in icon_cache_text
+    assert "QIcon gridToggleFallbackIcon()" in icon_cache_text
+    assert "Sketcher_GridToggle_Deactivated.svg" in icon_cache_text
+    assert "isGridToggleCommandId(command.id)" in shell_text
+    assert "gridToggleFallbackIcon()" in shell_text
+    assert "!isGridToggleCommandId(command.id)" in widget_text
 
 
 def test_startup_variant_menu_repair_is_enabled() -> None:

@@ -143,6 +143,7 @@ public:
             nextSurfaceStyle = QStringLiteral("glass");
         }
         const bool nextSurfaceTransparent = settings.ribbonSurfaceTransparent;
+        const bool nextButtonBordersVisible = settings.buttonBordersVisible;
         auto scaledSetting = [nextDisplayScalePercent](int value) -> int {
             return std::max(
                 1,
@@ -202,6 +203,7 @@ public:
             && m_displayScalePercent == nextDisplayScalePercent
             && m_surfaceStyle == nextSurfaceStyle
             && m_surfaceTransparent == nextSurfaceTransparent
+            && m_buttonBordersVisible == nextButtonBordersVisible
         ) {
             return;
         }
@@ -216,6 +218,7 @@ public:
         m_displayScalePercent = nextDisplayScalePercent;
         m_surfaceStyle = nextSurfaceStyle;
         m_surfaceTransparent = nextSurfaceTransparent;
+        m_buttonBordersVisible = nextButtonBordersVisible;
         QFont nextFont = font();
         nextFont.setPointSize(nextFontSize);
         m_baseFontPointSize = nextFontSize;
@@ -906,12 +909,14 @@ private:
 
         painter->setClipping(false);
         painter->setBrush(Qt::NoBrush);
-        painter->setPen(QPen(withAlpha(borderSeed, materialSurfaceAlpha(emphasized ? 188 : 108)), std::max(1.0, displayScaleFactor())));
-        painter->drawRoundedRect(
-            QRectF(surfaceRect).adjusted(0.5, 0.5, -0.5, -0.5),
-            cornerRadius,
-            cornerRadius
-        );
+        if (m_buttonBordersVisible) {
+            painter->setPen(QPen(withAlpha(borderSeed, materialSurfaceAlpha(emphasized ? 188 : 108)), std::max(1.0, displayScaleFactor())));
+            painter->drawRoundedRect(
+                QRectF(surfaceRect).adjusted(0.5, 0.5, -0.5, -0.5),
+                cornerRadius,
+                cornerRadius
+            );
+        }
         painter->restore();
     }
 
@@ -1056,7 +1061,11 @@ private:
             if (hasFocus() && !m_pressed) {
                 border = m_theme->buttonFocusBorder;
             }
-            painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
+            if (m_buttonBordersVisible) {
+                painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
+            } else {
+                painter->setPen(Qt::NoPen);
+            }
             painter->setBrush(fill);
             painter->drawRoundedRect(surfaceRect, scaledPx(5), scaledPx(5));
             textBackground = blendColors(textBackground, fill, m_pressed ? 0.46 : 0.30);
@@ -1179,7 +1188,11 @@ private:
             if (hasFocus() && !m_pressed) {
                 border = m_theme->buttonFocusBorder;
             }
-            painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
+            if (m_buttonBordersVisible) {
+                painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
+            } else {
+                painter->setPen(Qt::NoPen);
+            }
             painter->setBrush(fill);
             painter->drawRoundedRect(surfaceRect, scaledPx(5), scaledPx(5));
             textBackground = blendColors(textBackground, fill, m_pressed ? 0.44 : 0.28);
@@ -1467,7 +1480,7 @@ QMenu::separator {
             QAction* action = menu.addAction(commandtabCommandDisplayText(command));
             QAction* sourceAction = m_actionResolver ? m_actionResolver(command.id) : nullptr;
             QIcon actionIcon = loadCommandEntryIcon(command);
-            if (sourceAction != nullptr && !sourceAction->icon().isNull()) {
+            if (sourceAction != nullptr && !sourceAction->icon().isNull() && !isGridToggleCommandId(command.id)) {
                 actionIcon = sourceAction->icon();
             }
             if (!actionIcon.isNull()) {
@@ -1534,6 +1547,7 @@ QMenu::separator {
     int m_baseFontPointSize = 10;
     QString m_surfaceStyle = QStringLiteral("glass");
     bool m_surfaceTransparent = false;
+    bool m_buttonBordersVisible = true;
     CommandTabButtonSizeKind m_buttonSize = CommandTabButtonSizeKind::Small;
     bool m_textVisible = true;
     bool m_hovered = false;

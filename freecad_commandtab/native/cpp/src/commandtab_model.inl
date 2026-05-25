@@ -51,6 +51,7 @@ struct CommandTabSettingsState
     bool compactPanelLayout = true;
     int compactPanelSpacing = 1;
     int compactButtonPadding = 3;
+    bool buttonBordersVisible = true;
     bool panelDropdownModeEnabled = false;
     bool panelDropdownPrimaryRecent = false;
     int panelDropdownRecentToolCount = 2;
@@ -1192,6 +1193,7 @@ QJsonObject settingsToJsonObject(const CommandTabSettingsState& state)
     object.insert(QStringLiteral("compactPanelLayout"), state.compactPanelLayout);
     object.insert(QStringLiteral("compactPanelSpacing"), state.compactPanelSpacing);
     object.insert(QStringLiteral("compactButtonPadding"), state.compactButtonPadding);
+    object.insert(QStringLiteral("buttonBordersVisible"), state.buttonBordersVisible);
     object.insert(QStringLiteral("panelDropdownModeEnabled"), state.panelDropdownModeEnabled);
     object.insert(QStringLiteral("panelDropdownPrimaryRecent"), state.panelDropdownPrimaryRecent);
     object.insert(QStringLiteral("panelDropdownRecentToolCount"), state.panelDropdownRecentToolCount);
@@ -1578,6 +1580,9 @@ CommandTabSettingsState parseSettingsState(const QJsonObject& object)
         1,
         8
     );
+    state.buttonBordersVisible =
+        object.value(QStringLiteral("buttonBordersVisible"))
+            .toBool(state.buttonBordersVisible);
     state.panelDropdownModeEnabled =
         object.value(QStringLiteral("panelDropdownModeEnabled"))
             .toBool(state.panelDropdownModeEnabled);

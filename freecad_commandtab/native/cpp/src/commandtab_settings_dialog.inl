@@ -166,6 +166,15 @@ public:
         m_compactButtonPaddingSpin->setSuffix(QStringLiteral(" px"));
         commandtabLayoutGrid->addWidget(m_compactButtonPaddingSpin, layoutRow++, 1);
 
+        m_buttonBordersVisibleCheck = new QCheckBox(
+            trLabel("Show button outlines"),
+            commandtabLayoutTab
+        );
+        m_buttonBordersVisibleCheck->setToolTip(
+            trLabel("Disable this for flatter buttons while keeping hover and pressed fills.")
+        );
+        commandtabLayoutGrid->addWidget(m_buttonBordersVisibleCheck, layoutRow++, 0, 1, 2);
+
         m_panelDropdownModeCheck = new QCheckBox(
             trLabel("Enable panel dropdown arrows"),
             commandtabLayoutTab
@@ -905,6 +914,7 @@ QSpinBox::up-button, QSpinBox::down-button {
         m_panelDropdownPopupShowTextCheck->setEnabled(state.panelDropdownModeEnabled);
         m_compactPanelSpacingSpin->setValue(state.compactPanelSpacing);
         m_compactButtonPaddingSpin->setValue(state.compactButtonPadding);
+        m_buttonBordersVisibleCheck->setChecked(state.buttonBordersVisible);
         m_showIconTextSmallCheck->setChecked(state.showIconTextSmall);
         m_showIconTextMediumCheck->setChecked(state.showIconTextMedium);
         m_showIconTextLargeCheck->setChecked(state.showIconTextLarge);
@@ -1991,6 +2001,7 @@ QLabel#CommandTabColorPreviewPanelBody {
         );
         payload.insert(QStringLiteral("compactPanelSpacing"), m_compactPanelSpacingSpin->value());
         payload.insert(QStringLiteral("compactButtonPadding"), m_compactButtonPaddingSpin->value());
+        payload.insert(QStringLiteral("buttonBordersVisible"), m_buttonBordersVisibleCheck->isChecked());
         payload.insert(QStringLiteral("showIconTextSmall"), m_showIconTextSmallCheck->isChecked());
         payload.insert(QStringLiteral("showIconTextMedium"), m_showIconTextMediumCheck->isChecked());
         payload.insert(QStringLiteral("showIconTextLarge"), m_showIconTextLargeCheck->isChecked());
@@ -2070,6 +2081,7 @@ QLabel#CommandTabColorPreviewPanelBody {
     QCheckBox* m_panelDropdownPopupShowTextCheck = nullptr;
     QSpinBox* m_compactPanelSpacingSpin = nullptr;
     QSpinBox* m_compactButtonPaddingSpin = nullptr;
+    QCheckBox* m_buttonBordersVisibleCheck = nullptr;
     QCheckBox* m_showIconTextSmallCheck = nullptr;
     QCheckBox* m_showIconTextMediumCheck = nullptr;
     QCheckBox* m_showIconTextLargeCheck = nullptr;

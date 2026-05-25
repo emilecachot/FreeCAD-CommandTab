@@ -168,6 +168,7 @@ public:
             }
             if (m_commandHandler) {
                 m_commandHandler(QStringLiteral("__workbench__:%1").arg(m_workbenchIds.at(index)));
+                refreshCommandStatesAfterWorkbenchChange();
             }
         });
 
@@ -640,7 +641,7 @@ public:
         scheduleBackgroundPageWarmup();
         scheduleWorkbenchTabIconRefresh(80);
         scheduleCommandIconRefresh(30, 2);
-        scheduleCommandStateRefresh(30, 4);
+        refreshCommandStatesAfterWorkbenchChange();
         return true;
     }
 
@@ -656,6 +657,8 @@ public:
         const bool surfaceStyleChanged =
             state.ribbonSurfaceStyle != m_settingsState.ribbonSurfaceStyle
             || state.ribbonSurfaceTransparent != m_settingsState.ribbonSurfaceTransparent;
+        const bool buttonBordersChanged =
+            state.buttonBordersVisible != m_settingsState.buttonBordersVisible;
         const bool textVisibilityChanged =
             state.showIconTextSmall != m_settingsState.showIconTextSmall
             || state.showIconTextMedium != m_settingsState.showIconTextMedium
@@ -701,7 +704,7 @@ public:
             m_workbenchTabIconCache.clear();
             applyThemeStyleSheet();
             updateBrandWidget();
-        } else if (surfaceStyleChanged) {
+        } else if (surfaceStyleChanged || buttonBordersChanged) {
             applyThemeStyleSheet();
         }
 
@@ -753,6 +756,11 @@ public:
             && !surfaceStyleChanged
             && !tabClickPopupModeChanged
         ) {
+            if (buttonBordersChanged) {
+                for (int index = 0; index < m_pageBuildStates.size(); ++index) {
+                    refreshWorkbenchPageLayout(index);
+                }
+            }
             return true;
         }
 
@@ -766,6 +774,11 @@ public:
             && !surfaceStyleChanged
             && !tabClickPopupModeChanged
         ) {
+            if (buttonBordersChanged) {
+                for (int index = 0; index < m_pageBuildStates.size(); ++index) {
+                    refreshWorkbenchPageLayout(index);
+                }
+            }
             updateGeometry();
             if (m_contentChangedHandler) {
                 m_contentChangedHandler();
@@ -869,7 +882,7 @@ public:
         scheduleBackgroundPageWarmup();
         scheduleFullPagePreload();
         scheduleCommandIconRefresh(30, 2);
-        scheduleCommandStateRefresh(30, 4);
+        refreshCommandStatesAfterWorkbenchChange();
         return true;
     }
 
@@ -1205,6 +1218,9 @@ private:
         rebuildActionLookup();
 
         for (auto registryIt = m_commandButtonsById.begin(); registryIt != m_commandButtonsById.end(); ++registryIt) {
+            if (isGridToggleCommandId(registryIt.key())) {
+                continue;
+            }
             QAction* sourceAction = resolveActionForCommandId(registryIt.key());
             if (sourceAction == nullptr || sourceAction->icon().isNull()) {
                 continue;
@@ -1221,8 +1237,9 @@ private:
         }
 
         for (auto registryIt = m_commandToolButtonsById.begin(); registryIt != m_commandToolButtonsById.end(); ++registryIt) {
+            const bool gridToggleCommand = isGridToggleCommandId(registryIt.key());
             QAction* sourceAction = resolveActionForCommandId(registryIt.key());
-            if (sourceAction == nullptr || sourceAction->icon().isNull()) {
+            if (!gridToggleCommand && (sourceAction == nullptr || sourceAction->icon().isNull())) {
                 continue;
             }
             auto& toolButtons = registryIt.value();
@@ -1232,7 +1249,14 @@ private:
                     toolButtons.removeAt(index);
                     continue;
                 }
-                toolButton->setIcon(sourceAction->icon());
+                if (gridToggleCommand) {
+                    const QIcon gridIcon = gridToggleFallbackIcon();
+                    if (!gridIcon.isNull()) {
+                        toolButton->setIcon(gridIcon);
+                    }
+                } else {
+                    toolButton->setIcon(sourceAction->icon());
+                }
 
                 const QVariant preferredStyleValue = toolButton->property("commandtabPreferredToolButtonStyle");
                 if (preferredStyleValue.isValid()) {
@@ -1287,6 +1311,13 @@ private:
                 }
             }
         }
+    }
+
+    void refreshCommandStatesAfterWorkbenchChange()
+    {
+        requestActionLookupRefresh();
+        refreshCommandStatesFromActions();
+        scheduleCommandStateRefresh(0, 3);
     }
 
     void scheduleCommandIconRefresh(int delayMs = 220, int passes = 1)
@@ -2096,6 +2127,7 @@ QToolButton:disabled {
         QPalette shellPalette = palette();
         applyTextPalette(shellPalette);
         setPalette(shellPalette);
+        setProperty("commandtabButtonBordersVisible", m_settingsState.buttonBordersVisible);
 
         auto applyIndexedQss = [](QString style, const std::initializer_list<QString>& values) {
             int index = static_cast<int>(values.size());
@@ -2328,6 +2360,29 @@ QToolButton[commandtabRole="utility"]:focus {
 }
 QToolButton[commandtabRole="utility"]:disabled {
     color: %24;
+}
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"],
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"],
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"],
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"],
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"],
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"],
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"]:focus {
+    border: 1px solid transparent;
+}
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabHasMenuCommands="true"]::menu-button {
+    border-left: none;
 }
 QTabBar#CommandTabTabBar {
     background: transparent;
@@ -2945,6 +3000,9 @@ QWidget#CommandTabWorkbenchViewport {
             }
         }
         if (finished) {
+            if (m_stack != nullptr && m_stack->currentIndex() == index) {
+                refreshCommandStatesAfterWorkbenchChange();
+            }
             scheduleBackgroundPageWarmup();
         }
     }
@@ -3592,7 +3650,7 @@ QWidget#CommandTabWorkbenchViewport {
         button->setToolTip(label);
 
         QIcon icon = loadCommandEntryIcon(command);
-        if (sourceAction != nullptr && !sourceAction->icon().isNull()) {
+        if (sourceAction != nullptr && !sourceAction->icon().isNull() && !isGridToggleCommandId(command.id)) {
             icon = sourceAction->icon();
         }
         if (!icon.isNull()) {
@@ -4022,7 +4080,7 @@ QWidget#CommandTabWorkbenchViewport {
 
         QIcon icon = loadCommandEntryIcon(command);
         if (const QAction* sourceAction = resolveActionForCommandId(command.id)) {
-            if (!sourceAction->icon().isNull()) {
+            if (!sourceAction->icon().isNull() && !isGridToggleCommandId(command.id)) {
                 icon = sourceAction->icon();
             }
         }
@@ -4396,27 +4454,23 @@ QWidget#CommandTabWorkbenchViewport {
             button->setAutoRaise(false);
             button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
             QIcon quickIcon = loadCommandEntryIcon(command);
-            if (!runtimeActionIcon.isNull()) {
+            if (isGridToggleCommandId(command.id)) {
+                const QIcon gridIcon = gridToggleFallbackIcon();
+                if (!gridIcon.isNull()) {
+                    quickIcon = gridIcon;
+                }
+            } else if (!runtimeActionIcon.isNull()) {
                 quickIcon = runtimeActionIcon;
             }
             if (
                 (
-                    command.id == QStringLiteral("__commandtab_toggle_grid__")
-                    || command.id == QStringLiteral("Draft_ToggleGrid")
+                    isGridToggleCommandId(command.id)
                 )
                 && runtimeActionIcon.isNull()
             ) {
-                const QStringList fallbackCandidates = {
-                    QStringLiteral("Sketcher_GridToggle_Deactivated.svg"),
-                    QStringLiteral("Draft_ToggleGrid"),
-                    QStringLiteral("view-grid"),
-                };
-                for (const auto& candidate : fallbackCandidates) {
-                    const QIcon candidateIcon = loadIconFromSource(candidate);
-                    if (!candidateIcon.isNull()) {
-                        quickIcon = candidateIcon;
-                        break;
-                    }
+                const QIcon gridIcon = gridToggleFallbackIcon();
+                if (!gridIcon.isNull()) {
+                    quickIcon = gridIcon;
                 }
             }
             if (!quickIcon.isNull()) {
@@ -4452,7 +4506,7 @@ QWidget#CommandTabWorkbenchViewport {
         button->applySettings(m_settingsState);
         const bool isLargeCommand =
             command.size.trimmed().compare(QStringLiteral("large"), Qt::CaseInsensitive) == 0;
-        if (!runtimeActionIcon.isNull() && !isLargeCommand) {
+        if (!runtimeActionIcon.isNull() && !isLargeCommand && !isGridToggleCommandId(command.id)) {
             button->setIconOverride(runtimeActionIcon);
         }
         button->setActionResolver([this](const QString& commandId) {
