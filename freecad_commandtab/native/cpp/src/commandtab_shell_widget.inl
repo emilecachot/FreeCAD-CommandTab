@@ -2362,26 +2362,34 @@ QToolButton[commandtabRole="utility"]:disabled {
     color: %24;
 }
 #FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"],
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"]:hover,
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"]:focus,
 #FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"],
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"]:hover,
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"]:focus,
 #FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"],
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"]:hover,
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"]:focus,
 #FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"],
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"]:hover,
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"]:focus,
 #FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"],
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"]:hover,
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"]:focus,
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"],
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"]:hover,
-#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"]:focus {
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"] {
+    background: transparent;
     border: 1px solid transparent;
 }
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"]:hover,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"]:hover {
+    background: %10;
+    border: 1px solid %13;
+}
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelOption"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelExpand"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelPopupTool"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="panelSideTool"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="quick"]:focus,
+#FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabRole="utility"]:focus {
+    background: %10;
+    border: 1px solid %23;
+}
 #FreeCADCommandTabNativeShell[commandtabButtonBordersVisible="false"] QToolButton[commandtabHasMenuCommands="true"]::menu-button {
+    background: transparent;
     border-left: none;
 }
 QTabBar#CommandTabTabBar {

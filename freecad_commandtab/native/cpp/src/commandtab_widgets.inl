@@ -863,6 +863,9 @@ private:
         }
 
         const bool emphasized = m_hovered || m_pressed || hasFocus() || m_checked;
+        if (!m_buttonBordersVisible && !emphasized) {
+            return;
+        }
         const QColor topSeed = emphasized
             ? blendColors(m_theme->buttonActiveTop, m_theme->tabAccent, m_pressed ? 0.18 : 0.10)
             : blendColors(m_theme->buttonIdleTop, m_theme->panelBodyTop, 0.30);
@@ -930,6 +933,9 @@ private:
         }
 
         const bool emphasized = m_hovered || m_pressed || hasFocus() || m_checked;
+        if (!m_buttonBordersVisible && !emphasized) {
+            return;
+        }
         painter->save();
 
         QPainterPath clipPath;
@@ -1061,11 +1067,7 @@ private:
             if (hasFocus() && !m_pressed) {
                 border = m_theme->buttonFocusBorder;
             }
-            if (m_buttonBordersVisible) {
-                painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
-            } else {
-                painter->setPen(Qt::NoPen);
-            }
+            painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
             painter->setBrush(fill);
             painter->drawRoundedRect(surfaceRect, scaledPx(5), scaledPx(5));
             textBackground = blendColors(textBackground, fill, m_pressed ? 0.46 : 0.30);
@@ -1188,11 +1190,7 @@ private:
             if (hasFocus() && !m_pressed) {
                 border = m_theme->buttonFocusBorder;
             }
-            if (m_buttonBordersVisible) {
-                painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
-            } else {
-                painter->setPen(Qt::NoPen);
-            }
+            painter->setPen(QPen(border, hasFocus() ? 1.4 * displayScaleFactor() : 1.0));
             painter->setBrush(fill);
             painter->drawRoundedRect(surfaceRect, scaledPx(5), scaledPx(5));
             textBackground = blendColors(textBackground, fill, m_pressed ? 0.44 : 0.28);
