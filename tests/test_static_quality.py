@@ -327,6 +327,20 @@ def test_ondsel_defaults_can_be_disabled() -> None:
     assert "Apply Ondsel defaults at startup" in dialog_text
 
 
+def test_transparent_ribbon_enables_workspace_tree_overlay() -> None:
+    bootstrap_text = (ROOT / "freecad_commandtab" / "native" / "bootstrap.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "_workspace_tree_overlay_requested" in bootstrap_text
+    assert "_commandtab_bool_preference(\"RibbonSurfaceTransparent\"" in bootstrap_text
+    assert "_configure_transparent_workspace_tree_overlay()" in bootstrap_text
+    assert '"Tree view", "Property view"' in bootstrap_text
+    assert 'overlay_left.SetBool("Transparent", True)' in bootstrap_text
+    assert 'dock_windows.SetBool("Std_ComboView", False)' in bootstrap_text
+    assert "OVERLAY_DISABLED" in bootstrap_text
+
+
 def test_part_design_sketch_compound_label_is_corrected() -> None:
     bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
         encoding="utf-8"

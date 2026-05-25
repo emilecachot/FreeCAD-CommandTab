@@ -1197,11 +1197,80 @@ def remove_test_workbench() -> None:
             pass
 
 
+def _commandtab_bool_preference(name: str, default: bool = False) -> bool:
+    for path in [
+        "User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab/Settings",
+        "User parameter:BaseApp/Preferences/Mod/FreeCAD-CommandTab",
+    ]:
+        try:
+            group = App.ParamGet(path)
+            for setting_type, setting_name, *_ in group.GetContents():
+                if setting_type == "Boolean" and setting_name == name:
+                    return bool(group.GetBool(name))
+        except Exception:
+            continue
+    return bool(default)
+
+
+def _workspace_tree_overlay_requested() -> bool:
+    if bool(getattr(Parameters_CommandTab, "USE_FC_OVERLAY", False)) is True:
+        return True
+    if bool(getattr(Parameters_CommandTab, "MODERN_COMMANDTAB_STYLE_ENABLED", True)) is not True:
+        return False
+    return _commandtab_bool_preference("RibbonSurfaceTransparent", False)
+
+
+def _merge_overlay_widgets(existing_widgets: str, required_widgets: list[str]) -> str:
+    widgets: list[str] = []
+    seen: set[str] = set()
+    for candidate in list(required_widgets) + [
+        part.strip() for part in str(existing_widgets or "").split(",")
+    ]:
+        if candidate == "":
+            continue
+        key = candidate.lower()
+        if key in seen:
+            continue
+        widgets.append(candidate)
+        seen.add(key)
+    return ",".join(widgets) + ("," if widgets else "")
+
+
+def _configure_transparent_workspace_tree_overlay() -> None:
+    preferences = App.ParamGet("User parameter:BaseApp/Preferences/DockWindows")
+    preferences.SetBool("ActivateOverlay", True)
+    preferences.GetGroup("ComboView").SetBool("Enabled", False)
+    preferences.GetGroup("TreeView").SetBool("Enabled", True)
+    preferences.GetGroup("PropertyView").SetBool("Enabled", True)
+
+    dock_windows = App.ParamGet("User parameter:BaseApp/MainWindow/DockWindows")
+    dock_windows.SetBool("Std_ComboView", False)
+    dock_windows.SetBool("Std_TreeView", True)
+    dock_windows.SetBool("Std_PropertyView", True)
+
+    overlay_left = dock_windows.GetGroup("OverlayLeft")
+    overlay_left.SetString(
+        "Widgets",
+        _merge_overlay_widgets(
+            overlay_left.GetString("Widgets"),
+            ["Tree view", "Property view"],
+        ),
+    )
+    if overlay_left.GetString("Sizes").strip() == "":
+        overlay_left.SetString("Sizes", "690,485")
+    if overlay_left.GetInt("Width") <= 0:
+        overlay_left.SetInt("Width", 450)
+    if overlay_left.GetInt("Height") <= 0:
+        overlay_left.SetInt("Height", 900)
+    overlay_left.SetBool("Transparent", True)
+
+
 def configure_overlay_preferences() -> None:
     with StartupTrace.span("bootstrap.configure_overlay_preferences"):
         use_custom_overlay_flag = paths.addon_path("OVERLAY_DISABLED")
+        overlay_requested = _workspace_tree_overlay_requested()
         if (
-            Parameters_CommandTab.USE_FC_OVERLAY is False
+            overlay_requested is False
             or os.path.exists(use_custom_overlay_flag) is True
         ):
             preferences = App.ParamGet("User parameter:BaseApp/Preferences/DockWindows")
@@ -1212,9 +1281,13 @@ def configure_overlay_preferences() -> None:
             )
             preferences.SetString("Widgets", "")
 
-        if Parameters_CommandTab.USE_FC_OVERLAY is True:
-            preferences = App.ParamGet("User parameter:BaseApp/Preferences/DockWindows")
-            preferences.SetBool("ActivateOverlay", True)
+        if (
+            overlay_requested is True
+            and os.path.exists(use_custom_overlay_flag) is False
+        ):
+            _configure_transparent_workspace_tree_overlay()
+
+        App.saveParameter()
 
 
 def attach_ui(native_commandtab_active: bool) -> None:
