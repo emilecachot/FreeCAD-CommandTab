@@ -1389,7 +1389,10 @@ void applySettingsToWorkbench(CommandTabWorkbenchEntry& workbench, const Command
 QString correctedCommandDisplayText(const QString& commandId, QString text)
 {
     text = text.replace(QStringLiteral("&"), QString()).simplified();
-    if (commandId == QStringLiteral("PartDesign_CompSketches")) {
+    if (
+        commandId == QStringLiteral("PartDesign_CompSketches")
+        || commandId == QStringLiteral("PartDesign_NewSketch")
+    ) {
         const QString translated = QCoreApplication::translate("CmdPartDesignNewSketch", "New Sketch");
         return translated.trimmed().isEmpty() ? QStringLiteral("New Sketch") : translated.simplified();
     }

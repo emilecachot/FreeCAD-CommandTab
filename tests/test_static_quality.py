@@ -308,6 +308,34 @@ def test_native_icon_cache_preloads_static_variant_children() -> None:
     assert "loadCommandEntryIcon(m_iconPreloadQueue.at(m_iconPreloadCursor))" in shell_text
 
 
+def test_workbench_tab_icons_are_cached_and_stable() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    shell_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl").read_text(
+        encoding="utf-8"
+    )
+
+    assert "_workbench_icon_export_path(workbench_name, persistent=True)" in bridge_text
+    assert "if persistent_path.exists()" in bridge_text
+    assert "m_workbenchTabIconCache" in shell_text
+    assert "if (!m_tabBar->tabIcon(tabIndex).isNull())" in shell_text
+
+
+def test_panel_footer_uses_antialiased_painted_surface() -> None:
+    widget_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_widgets.inl").read_text(
+        encoding="utf-8"
+    )
+    shell_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl").read_text(
+        encoding="utf-8"
+    )
+
+    assert "class CommandTabPanelFooterWidget final" in widget_text
+    assert "painter.setRenderHint(QPainter::Antialiasing, true)" in widget_text
+    assert "new CommandTabPanelFooterWidget(&m_theme, m_settingsState, panelWidget)" in shell_text
+    assert "setProperty(\"commandtabPanelDisplayTitle\", panelDisplayTitle)" in shell_text
+
+
 def test_native_runtime_and_bootstrap_payload_cache_are_user_scoped() -> None:
     bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
         encoding="utf-8"

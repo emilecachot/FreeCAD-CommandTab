@@ -451,6 +451,7 @@ public:
         m_baseTheme = model.theme;
         m_theme = normalizeShellTheme(applySettingsThemeOverrides(m_baseTheme, m_settingsState));
         m_model.theme = m_theme;
+        m_workbenchTabIconCache.clear();
         applyThemeStyleSheet();
         applyShellDisplayScaleMetrics();
         if (m_customizationDialog != nullptr) {
@@ -611,6 +612,7 @@ public:
         if (themeOverrideChanged) {
             m_theme = normalizeShellTheme(applySettingsThemeOverrides(m_baseTheme, state));
             m_model.theme = m_theme;
+            m_workbenchTabIconCache.clear();
             applyThemeStyleSheet();
             updateBrandWidget();
         } else if (surfaceStyleChanged) {
@@ -1003,6 +1005,16 @@ private:
 
     QIcon resolveWorkbenchIcon(const CommandTabWorkbenchEntry& workbench) const
     {
+        const QString cacheKey = QStringLiteral("%1|%2|%3").arg(
+            workbench.id.trimmed(),
+            workbench.title.trimmed(),
+            workbench.iconPath.trimmed()
+        );
+        const auto cacheIt = m_workbenchTabIconCache.constFind(cacheKey);
+        if (cacheIt != m_workbenchTabIconCache.constEnd()) {
+            return cacheIt.value();
+        }
+
         const QString explicitIconPath = workbench.iconPath.trimmed();
         const QString normalizedExplicitIcon = explicitIconPath.toLower();
         if (
@@ -1012,6 +1024,7 @@ private:
         ) {
             QIcon icon = loadIconFromSource(explicitIconPath);
             if (!icon.isNull()) {
+                m_workbenchTabIconCache.insert(cacheKey, icon);
                 return icon;
             }
 
@@ -1024,6 +1037,7 @@ private:
                         QStringLiteral("Recovered stale workbench icon for '%1' using stem '%2'")
                             .arg(workbench.id, staleStemCandidate)
                     );
+                    m_workbenchTabIconCache.insert(cacheKey, icon);
                     return icon;
                 }
             }
@@ -1041,6 +1055,7 @@ private:
             }
             QIcon icon = loadIconFromSource(candidate);
             if (!icon.isNull()) {
+                m_workbenchTabIconCache.insert(cacheKey, icon);
                 return icon;
             }
         }
@@ -1055,7 +1070,11 @@ private:
             4.5
         );
         const QString fallbackLabel = workbench.title.trimmed().isEmpty() ? workbench.id : workbench.title;
-        return buildMonogramIcon(fallbackLabel, workbenchTabIconSize(), badgeBackground, badgeForeground);
+        const QIcon fallbackIcon = buildMonogramIcon(fallbackLabel, workbenchTabIconSize(), badgeBackground, badgeForeground);
+        if (!fallbackIcon.isNull()) {
+            m_workbenchTabIconCache.insert(cacheKey, fallbackIcon);
+        }
+        return fallbackIcon;
     }
 
     void refreshWorkbenchTabIcons()
@@ -1070,6 +1089,9 @@ private:
         }
 
         for (int tabIndex = 0; tabIndex < tabCount; ++tabIndex) {
+            if (!m_tabBar->tabIcon(tabIndex).isNull()) {
+                continue;
+            }
             const QIcon icon = resolveWorkbenchIcon(m_workbenchEntries.at(tabIndex));
             if (!icon.isNull()) {
                 m_tabBar->setTabIcon(tabIndex, icon);
@@ -2672,11 +2694,11 @@ QWidget#CommandTabWorkbenchViewport {
         if (metrics.textCount == 0 && metrics.iconOnlyCount > 0) {
             minimumWidth = scaledPx(72);
         } else if (metrics.largeCount > 0) {
-            minimumWidth = scaledPx(118);
+            minimumWidth = scaledPx(128);
         } else if (metrics.mediumCount > 0) {
-            minimumWidth = scaledPx(96);
+            minimumWidth = scaledPx(128);
         } else if (metrics.smallCount > 0) {
-            minimumWidth = scaledPx(72);
+            minimumWidth = scaledPx(114);
         }
 
         // The compact panel width helper keeps panels from expanding below
@@ -2740,10 +2762,12 @@ QWidget#CommandTabWorkbenchViewport {
 
             if (auto* titleLabel = footerWidget->findChild<QLabel*>(QStringLiteral("CommandTabPanelTitle"))) {
                 QFont titleFont = titleLabel->font();
-                titleFont.setPointSize(std::clamp(scaledPx(10), 7, 20));
+                titleFont.setPixelSize(std::clamp(scaledPx(12), 10, 24));
                 titleFont.setWeight(QFont::Bold);
+                titleFont.setStyleStrategy(QFont::PreferAntialias);
                 titleLabel->setFont(titleFont);
-                const QString panelTitle = titleLabel->toolTip();
+                const QString displayTitle = titleLabel->property("commandtabPanelDisplayTitle").toString().trimmed();
+                const QString panelTitle = displayTitle.isEmpty() ? titleLabel->text().trimmed() : displayTitle;
                 const int desiredTitleWidth = titleLabel->fontMetrics().horizontalAdvance(panelTitle) + scaledPx(18);
                 panelInnerWidth = std::max(panelInnerWidth, desiredTitleWidth + scaledPx(10));
                 footerWidget->setFixedWidth(panelInnerWidth);
@@ -2761,6 +2785,9 @@ QWidget#CommandTabWorkbenchViewport {
                 titleLabel->setFixedHeight(titleHeight);
                 titleLabel->setText(panelTitle);
                 footerWidget->setFixedHeight(nextFooterHeight);
+                if (auto* paintedFooter = dynamic_cast<CommandTabPanelFooterWidget*>(footerWidget)) {
+                    paintedFooter->applySettings(m_settingsState);
+                }
 
                 const QRect safeRect = footerWidget->rect().adjusted(
                     scaledPx(2),
@@ -3922,7 +3949,6 @@ QWidget#CommandTabWorkbenchViewport {
         auto* panelWidget = new QWidget(this);
         panelWidget->setObjectName(QStringLiteral("CommandTabPanelCard"));
         panelWidget->setAttribute(Qt::WA_StyledBackground, true);
-        installRoundedMask(panelWidget, scaledPx(12));
         panelWidget->setProperty("commandtabPanelUsageKey", panelKey);
         panelWidget->setProperty("commandtabWorkbenchId", workbenchId);
         panelWidget->setProperty("commandtabPanelId", panel.id);
@@ -3934,7 +3960,6 @@ QWidget#CommandTabWorkbenchViewport {
         panelLayout->setSpacing(panelContentSpacing);
 
         auto* bodyFrame = new CommandTabPanelBodyWidget(&m_theme, m_settingsState, panelWidget);
-        installRoundedMask(bodyFrame, scaledPx(8));
         const bool panelDropdownModeEnabled = m_settingsState.panelDropdownModeEnabled;
         if (panelDropdownModeEnabled) {
             const CommandTabCommandEntry primaryCommand = resolvePrimaryPanelCommand(workbenchId, panel);
@@ -4000,10 +4025,7 @@ QWidget#CommandTabWorkbenchViewport {
             bodyFrame->sizeHint().width(),
             std::max(scaledPx(42), panelWidth - (panelInset * 2))
         );
-        auto* footerWidget = new QWidget(panelWidget);
-        footerWidget->setObjectName(QStringLiteral("CommandTabPanelFooter"));
-        footerWidget->setAttribute(Qt::WA_StyledBackground, true);
-        installRoundedMask(footerWidget, scaledPx(12));
+        auto* footerWidget = new CommandTabPanelFooterWidget(&m_theme, m_settingsState, panelWidget);
         auto* footerLayout = new QHBoxLayout(footerWidget);
         if (m_settingsState.compactPanelLayout) {
             footerLayout->setContentsMargins(scaledPx(6), scaledPx(3), scaledPx(6), scaledPx(3));
@@ -4056,6 +4078,7 @@ QWidget#CommandTabWorkbenchViewport {
         titleLabel->setFixedHeight(titleHeight);
         const QString fullPanelTitle = panel.title.trimmed().isEmpty() ? panelDisplayTitle : panel.title.trimmed();
         titleLabel->setToolTip(fullPanelTitle);
+        titleLabel->setProperty("commandtabPanelDisplayTitle", panelDisplayTitle);
         titleLabel->setText(panelDisplayTitle);
         footerWidget->setFixedHeight(footerHeight);
 
@@ -4573,6 +4596,7 @@ private:
     QColor m_tabSelectedTextColor;
     QColor m_tabDisabledTextColor;
     CommandTabModel::CommandTabTheme m_baseTheme;
+    mutable QHash<QString, QIcon> m_workbenchTabIconCache;
     CommandTabModel m_model;
     QVector<QString> m_workbenchIds;
     QVector<CommandTabWorkbenchEntry> m_workbenchEntries;

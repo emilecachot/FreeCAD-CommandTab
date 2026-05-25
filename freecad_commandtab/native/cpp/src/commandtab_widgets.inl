@@ -262,12 +262,12 @@ public:
             return std::max(compactButtonWidth(), m_preferredSize.width());
         }
         if (m_buttonSize == CommandTabButtonSizeKind::Large) {
-            return std::max(scaledPx(116), m_preferredSize.width());
+            return std::max(scaledPx(126), m_preferredSize.width());
         }
 
         if (m_buttonSize == CommandTabButtonSizeKind::Medium) {
             const QFontMetrics metrics(font());
-            for (int candidateWidth = scaledPx(102); candidateWidth <= scaledPx(186); candidateWidth += std::max(1, scaledPx(6))) {
+            for (int candidateWidth = scaledPx(126); candidateWidth <= scaledPx(186); candidateWidth += std::max(1, scaledPx(6))) {
                 const int textWidth = std::max(scaledPx(56), candidateWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8));
                 const QStringList wrapped = wrapCommandTabTextExact(m_rawText, metrics, textWidth);
                 if (!wrapped.isEmpty() && wrapped.size() <= maxDisplayLines()) {
@@ -278,7 +278,7 @@ public:
         }
 
         const QFontMetrics metrics(font());
-        for (int candidateWidth = scaledPx(84); candidateWidth <= scaledPx(156); candidateWidth += std::max(1, scaledPx(6))) {
+        for (int candidateWidth = scaledPx(112); candidateWidth <= scaledPx(156); candidateWidth += std::max(1, scaledPx(6))) {
             const int textWidth = std::max(scaledPx(50), candidateWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8));
             const QStringList wrapped = wrapCommandTabTextExact(m_rawText, metrics, textWidth);
             if (!wrapped.isEmpty() && wrapped.size() <= maxDisplayLines()) {
@@ -321,8 +321,8 @@ public:
         }
 
         const int minimumWidth = m_buttonSize == CommandTabButtonSizeKind::Large
-            ? scaledPx(116)
-            : (m_buttonSize == CommandTabButtonSizeKind::Medium ? scaledPx(102) : scaledPx(84));
+            ? scaledPx(126)
+            : (m_buttonSize == CommandTabButtonSizeKind::Medium ? scaledPx(126) : scaledPx(112));
         const int normalizedWidth = std::max(width, minimumWidth);
         if (normalizedWidth == m_assignedWidth) {
             return;
@@ -742,6 +742,96 @@ private:
         return ensureReadableTextColor(background, softened, 4.0);
     }
 
+    int materialSurfaceAlpha(int alpha) const
+    {
+        qreal factor = 1.0;
+        if (m_surfaceStyle == QStringLiteral("mat")) {
+            factor = 0.94;
+        } else if (m_surfaceStyle == QStringLiteral("normal")) {
+            factor = 0.98;
+        }
+        if (m_surfaceTransparent) {
+            factor *= (m_surfaceStyle == QStringLiteral("mat")) ? 0.72 : 0.60;
+        }
+        return std::clamp(qRound(static_cast<qreal>(alpha) * factor), 0, 255);
+    }
+
+    int materialHighlightAlpha(int alpha) const
+    {
+        qreal factor = 1.0;
+        if (m_surfaceStyle == QStringLiteral("mat")) {
+            factor = 0.08;
+        } else if (m_surfaceStyle == QStringLiteral("normal")) {
+            factor = 0.44;
+        }
+        if (m_surfaceTransparent) {
+            factor *= 0.72;
+        }
+        return std::clamp(qRound(static_cast<qreal>(alpha) * factor), 0, 255);
+    }
+
+    void paintButtonBaseSurface(QPainter* painter, const QRect& surfaceRect, int cornerRadius) const
+    {
+        if (painter == nullptr || m_theme == nullptr || !surfaceRect.isValid()) {
+            return;
+        }
+
+        const bool emphasized = m_hovered || m_pressed || hasFocus() || m_checked;
+        const QColor topSeed = emphasized
+            ? blendColors(m_theme->buttonActiveTop, m_theme->tabAccent, m_pressed ? 0.18 : 0.10)
+            : blendColors(m_theme->buttonIdleTop, m_theme->panelBodyTop, 0.30);
+        const QColor bottomSeed = emphasized
+            ? blendColors(m_theme->buttonActiveBottom, m_theme->panelBodyBottom, m_pressed ? 0.22 : 0.12)
+            : blendColors(m_theme->buttonIdleBottom, m_theme->panelCardBackground, 0.24);
+        const QColor borderSeed = emphasized
+            ? blendColors(m_theme->buttonActiveBorder, m_theme->tabAccent, 0.24)
+            : blendColors(m_theme->buttonBorder, m_theme->panelCardBorder, 0.24);
+
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        QPainterPath path;
+        path.addRoundedRect(QRectF(surfaceRect), cornerRadius, cornerRadius);
+        painter->setClipPath(path);
+        painter->setPen(Qt::NoPen);
+
+        if (m_surfaceStyle == QStringLiteral("mat")) {
+            painter->setBrush(withAlpha(blendColors(topSeed, bottomSeed, 0.56), materialSurfaceAlpha(emphasized ? 208 : 142)));
+            painter->drawPath(path);
+        } else {
+            QLinearGradient gradient(surfaceRect.topLeft(), surfaceRect.bottomLeft());
+            gradient.setColorAt(
+                0.0,
+                withAlpha(
+                    blendColors(topSeed, QColor(QStringLiteral("#ffffff")), m_surfaceStyle == QStringLiteral("glass") ? 0.18 : 0.07),
+                    materialSurfaceAlpha(emphasized ? 224 : 146)
+                )
+            );
+            gradient.setColorAt(
+                0.55,
+                withAlpha(blendColors(topSeed, bottomSeed, 0.42), materialSurfaceAlpha(emphasized ? 196 : 118))
+            );
+            gradient.setColorAt(
+                1.0,
+                withAlpha(
+                    blendColors(bottomSeed, QColor(QStringLiteral("#000000")), m_theme->isDark ? 0.14 : 0.05),
+                    materialSurfaceAlpha(emphasized ? 218 : 132)
+                )
+            );
+            painter->setBrush(gradient);
+            painter->drawPath(path);
+        }
+
+        painter->setClipping(false);
+        painter->setBrush(Qt::NoBrush);
+        painter->setPen(QPen(withAlpha(borderSeed, materialSurfaceAlpha(emphasized ? 188 : 108)), std::max(1.0, displayScaleFactor())));
+        painter->drawRoundedRect(
+            QRectF(surfaceRect).adjusted(0.5, 0.5, -0.5, -0.5),
+            cornerRadius,
+            cornerRadius
+        );
+        painter->restore();
+    }
+
     void paintGlassSpecularLayer(QPainter* painter, const QRect& surfaceRect, int cornerRadius) const
     {
         if (painter == nullptr || m_theme == nullptr || !isEnabled() || !surfaceRect.isValid()) {
@@ -752,11 +842,6 @@ private:
         }
 
         const bool emphasized = m_hovered || m_pressed || hasFocus() || m_checked;
-        const qreal materialFactor = (m_surfaceStyle == QStringLiteral("normal")) ? 0.46 : 1.0;
-        const qreal transparencyFactor = m_surfaceTransparent ? 0.76 : 1.0;
-        auto materialAlpha = [materialFactor, transparencyFactor](int alpha) -> int {
-            return std::clamp(qRound(static_cast<qreal>(alpha) * materialFactor * transparencyFactor), 0, 255);
-        };
         painter->save();
 
         QPainterPath clipPath;
@@ -785,7 +870,7 @@ private:
                         QColor(QStringLiteral("#ffffff")),
                         m_theme->isDark ? 0.76 : 0.86
                     ),
-                    materialAlpha(emphasized ? (m_theme->isDark ? 78 : 112) : (m_theme->isDark ? 54 : 86))
+                    materialHighlightAlpha(emphasized ? (m_theme->isDark ? 86 : 124) : (m_theme->isDark ? 60 : 94))
                 )
             );
             topSheen.setColorAt(1.0, withAlpha(QColor(QStringLiteral("#ffffff")), 0));
@@ -799,8 +884,8 @@ private:
             QPointF(surfaceRect.right() + scaledPx(4), surfaceRect.bottom() - scaledPx(1))
         );
         streak.setColorAt(0.00, withAlpha(QColor(QStringLiteral("#ffffff")), 0));
-        streak.setColorAt(0.24, withAlpha(QColor(QStringLiteral("#ffffff")), materialAlpha(emphasized ? 34 : 20)));
-        streak.setColorAt(0.48, withAlpha(QColor(QStringLiteral("#ffffff")), materialAlpha(emphasized ? 16 : 10)));
+        streak.setColorAt(0.24, withAlpha(QColor(QStringLiteral("#ffffff")), materialHighlightAlpha(emphasized ? 42 : 24)));
+        streak.setColorAt(0.48, withAlpha(QColor(QStringLiteral("#ffffff")), materialHighlightAlpha(emphasized ? 20 : 12)));
         streak.setColorAt(0.72, withAlpha(QColor(QStringLiteral("#ffffff")), 0));
         painter->setBrush(streak);
         painter->drawRect(surfaceRect);
@@ -819,7 +904,7 @@ private:
                     QColor(QStringLiteral("#ffffff")),
                     m_theme->isDark ? 0.74 : 0.84
                 ),
-                materialAlpha(emphasized ? (m_theme->isDark ? 56 : 78) : (m_theme->isDark ? 36 : 58))
+                materialHighlightAlpha(emphasized ? (m_theme->isDark ? 64 : 88) : (m_theme->isDark ? 42 : 66))
             )
         );
         glint.setColorAt(1.0, withAlpha(QColor(QStringLiteral("#ffffff")), 0));
@@ -836,7 +921,7 @@ private:
         if (lowerRect.height() > scaledPx(2)) {
             QLinearGradient lowerTint(lowerRect.topLeft(), lowerRect.bottomLeft());
             lowerTint.setColorAt(0.0, withAlpha(QColor(QStringLiteral("#000000")), 0));
-            lowerTint.setColorAt(1.0, withAlpha(QColor(QStringLiteral("#000000")), materialAlpha(emphasized ? 34 : 24)));
+            lowerTint.setColorAt(1.0, withAlpha(QColor(QStringLiteral("#000000")), materialHighlightAlpha(emphasized ? 34 : 24)));
             painter->setBrush(lowerTint);
             painter->drawRoundedRect(lowerRect, std::max(1, cornerRadius - scaledPx(1)), std::max(1, cornerRadius - scaledPx(1)));
         }
@@ -866,6 +951,7 @@ private:
             scaledPx(1), scaledPx(1), -scaledPx(1), -scaledPx(1)
         );
         QColor textBackground = baseTextBackgroundColor();
+        paintButtonBaseSurface(painter, surfaceRect, scaledPx(5));
         if (m_checked && !(m_pressed || m_hovered || hasFocus())) {
             const QColor fill = withAlpha(
                 blendColors(m_theme->panelBodyTop, m_theme->tabAccent, 0.18),
@@ -990,6 +1076,7 @@ private:
             scaledPx(1), scaledPx(1), -scaledPx(1), -scaledPx(1)
         );
         QColor textBackground = baseTextBackgroundColor();
+        paintButtonBaseSurface(painter, surfaceRect, scaledPx(5));
         if (m_checked && !(m_pressed || m_hovered || hasFocus())) {
             const QColor fill = withAlpha(
                 blendColors(m_theme->panelBodyTop, m_theme->tabAccent, 0.16),
@@ -1438,6 +1525,160 @@ private:
     qreal displayScaleFactor() const
     {
         return static_cast<qreal>(std::clamp(m_displayScalePercent, 60, 140)) / 100.0;
+    }
+
+    int scaledPx(int value) const
+    {
+        return std::max(1, qRound(static_cast<qreal>(value) * displayScaleFactor()));
+    }
+};
+
+class CommandTabPanelFooterWidget final : public QWidget
+{
+public:
+    explicit CommandTabPanelFooterWidget(
+        const CommandTabModel::CommandTabTheme* theme,
+        const CommandTabSettingsState& settings,
+        QWidget* parent = nullptr
+    )
+        : QWidget(parent)
+        , m_theme(theme)
+        , m_settingsState(settings)
+    {
+        setObjectName(QStringLiteral("CommandTabPanelFooter"));
+        setAttribute(Qt::WA_StyledBackground, false);
+        setAutoFillBackground(false);
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    }
+
+    void applySettings(const CommandTabSettingsState& settings)
+    {
+        m_settingsState = settings;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent* event) override
+    {
+        Q_UNUSED(event);
+        if (m_theme == nullptr) {
+            return;
+        }
+
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        const QRectF surface = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+        if (!surface.isValid()) {
+            return;
+        }
+
+        QString surfaceStyle = m_settingsState.ribbonSurfaceStyle.trimmed().toLower();
+        if (
+            surfaceStyle != QStringLiteral("mat")
+            && surfaceStyle != QStringLiteral("normal")
+            && surfaceStyle != QStringLiteral("glass")
+        ) {
+            surfaceStyle = QStringLiteral("glass");
+        }
+        const bool transparent = m_settingsState.ribbonSurfaceTransparent;
+        auto alpha = [surfaceStyle, transparent](int value) -> int {
+            qreal factor = 1.0;
+            if (surfaceStyle == QStringLiteral("mat")) {
+                factor = 0.94;
+            } else if (surfaceStyle == QStringLiteral("normal")) {
+                factor = 0.98;
+            }
+            if (transparent) {
+                factor *= surfaceStyle == QStringLiteral("mat") ? 0.72 : 0.60;
+            }
+            return std::clamp(qRound(static_cast<qreal>(value) * factor), 42, 255);
+        };
+        auto shineAlpha = [surfaceStyle, transparent](int value) -> int {
+            qreal factor = surfaceStyle == QStringLiteral("mat")
+                ? 0.10
+                : (surfaceStyle == QStringLiteral("normal") ? 0.42 : 1.0);
+            if (transparent) {
+                factor *= 0.72;
+            }
+            return std::clamp(qRound(static_cast<qreal>(value) * factor), 0, 255);
+        };
+
+        const QColor base = blendColors(
+            blendColors(m_theme->panelFooterBackground, m_theme->panelCardBackground, 0.42),
+            m_theme->shellBackground,
+            m_theme->isDark ? 0.16 : 0.08
+        );
+        const QColor accent = blendColors(base, m_theme->tabAccent, m_theme->isDark ? 0.20 : 0.12);
+        QPainterPath path;
+        path.addRoundedRect(surface, scaledPx(12), scaledPx(12));
+        painter.setPen(Qt::NoPen);
+
+        if (surfaceStyle == QStringLiteral("mat")) {
+            painter.setBrush(withAlpha(blendColors(base, accent, 0.28), alpha(m_theme->isDark ? 212 : 232)));
+            painter.drawPath(path);
+        } else {
+            QLinearGradient gradient(surface.topLeft(), surface.bottomLeft());
+            gradient.setColorAt(
+                0.0,
+                withAlpha(
+                    blendColors(accent, QColor(QStringLiteral("#ffffff")), surfaceStyle == QStringLiteral("glass") ? 0.20 : 0.08),
+                    alpha(m_theme->isDark ? 224 : 242)
+                )
+            );
+            gradient.setColorAt(0.58, withAlpha(blendColors(base, accent, 0.18), alpha(m_theme->isDark ? 184 : 214)));
+            gradient.setColorAt(
+                1.0,
+                withAlpha(
+                    blendColors(base, QColor(QStringLiteral("#000000")), m_theme->isDark ? 0.14 : 0.04),
+                    alpha(m_theme->isDark ? 198 : 224)
+                )
+            );
+            painter.setBrush(gradient);
+            painter.drawPath(path);
+        }
+
+        if (surfaceStyle != QStringLiteral("mat")) {
+            const QRectF shine = surface.adjusted(
+                scaledPx(2),
+                scaledPx(2),
+                -scaledPx(2),
+                -std::max(scaledPx(7), qRound(surface.height() * 0.45))
+            );
+            if (shine.height() > scaledPx(2)) {
+                QLinearGradient shineGradient(shine.topLeft(), shine.bottomLeft());
+                shineGradient.setColorAt(
+                    0.0,
+                    withAlpha(
+                        blendColors(m_theme->tabAccent, QColor(QStringLiteral("#ffffff")), m_theme->isDark ? 0.70 : 0.82),
+                        shineAlpha(m_theme->isDark ? 90 : 132)
+                    )
+                );
+                shineGradient.setColorAt(1.0, withAlpha(QColor(QStringLiteral("#ffffff")), 0));
+                painter.setBrush(shineGradient);
+                painter.drawRoundedRect(shine, scaledPx(10), scaledPx(10));
+            }
+        }
+
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(
+            QPen(
+                withAlpha(
+                    blendColors(m_theme->panelFooterBorder, m_theme->tabSelectedBorder, 0.22),
+                    alpha(m_theme->isDark ? 188 : 178)
+                ),
+                std::max(1.0, displayScaleFactor())
+            )
+        );
+        painter.drawRoundedRect(surface, scaledPx(12), scaledPx(12));
+    }
+
+private:
+    const CommandTabModel::CommandTabTheme* m_theme = nullptr;
+    CommandTabSettingsState m_settingsState;
+
+    qreal displayScaleFactor() const
+    {
+        return static_cast<qreal>(std::clamp(m_settingsState.commandtabScalePercent, 60, 140)) / 100.0;
     }
 
     int scaledPx(int value) const

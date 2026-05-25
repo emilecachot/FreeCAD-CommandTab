@@ -78,6 +78,7 @@ _VARIANT_MENU_CACHE_MEMORY: dict[str, object] = {}
 _STATIC_COMMAND_VARIANT_MENU_CACHE: dict[str, list[object]] | None = None
 _COMMAND_DISPLAY_TEXT_OVERRIDES: dict[str, tuple[str, str]] = {
     "PartDesign_CompSketches": ("CmdPartDesignNewSketch", "New Sketch"),
+    "PartDesign_NewSketch": ("CmdPartDesignNewSketch", "New Sketch"),
 }
 _WORKBENCH_PRELOAD_IN_PROGRESS = False
 _WORKBENCH_PRELOAD_ENABLED = str(
@@ -2451,6 +2452,10 @@ def _workbench_icon_path(workbench_name: str, persistent: bool = False) -> str:
         cached_value = _WORKBENCH_ICON_CACHE.get(workbench_name)
         if cached_value is not None:
             return cached_value
+    else:
+        persistent_path = _workbench_icon_export_path(workbench_name, persistent=True)
+        if persistent_path.exists():
+            return str(persistent_path)
 
     raw_icon_value = None
     workbench = None
