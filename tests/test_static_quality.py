@@ -322,6 +322,41 @@ def test_workbench_tab_icons_are_cached_and_stable() -> None:
     assert "if (!m_tabBar->tabIcon(tabIndex).isNull())" in shell_text
 
 
+def test_native_background_preload_yields_to_ribbon_interaction() -> None:
+    shell_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl"
+    ).read_text(encoding="utf-8")
+
+    assert "qApp->installEventFilter(this)" in shell_text
+    assert "isRibbonEventTarget(watched)" in shell_text
+    assert "shouldYieldBackgroundRibbonWork" in shell_text
+    assert "ensureWorkbenchPage(index, 100000, false)" not in shell_text
+    assert "const int budget = 8" in shell_text
+    assert "buildWorkbenchPageChunk(index, currentPage ? 5 : 2)" in shell_text
+    assert "QTimer::singleShot(std::clamp(delayMs, 30, 1200)" in shell_text
+
+
+def test_command_button_hover_and_labels_are_latency_aware() -> None:
+    widget_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_widgets.inl"
+    ).read_text(encoding="utf-8")
+
+    assert "m_baseFontPointSize" in widget_text
+    assert "minimumFitPointSize" in widget_text
+    assert "linesFitWidth(candidateLines" in widget_text
+    assert "repaint();" in widget_text
+
+
+def test_command_icon_fallback_avoids_native_file_document_icon() -> None:
+    icon_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_icon_cache.inl"
+    ).read_text(encoding="utf-8")
+
+    assert "genericCommandFallbackGlyph" in icon_text
+    assert "QStyle::SP_FileIcon" not in icon_text
+    assert "genericCommandFallbackIcon(fallbackLabel)" in icon_text
+
+
 def test_panel_footer_uses_antialiased_painted_surface() -> None:
     widget_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_widgets.inl").read_text(
         encoding="utf-8"

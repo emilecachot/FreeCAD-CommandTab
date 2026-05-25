@@ -198,36 +198,54 @@ QString staleIconStemCandidate(const QString& iconPath)
     return stem;
 }
 
-QIcon genericCommandFallbackIcon()
+QString genericCommandFallbackGlyph(const QString& label)
 {
-    static QIcon cachedFallbackIcon;
-    if (!cachedFallbackIcon.isNull()) {
-        return cachedFallbackIcon;
+    const QString simplified = label.simplified();
+    if (simplified.isEmpty()) {
+        return QStringLiteral("?");
     }
 
-    if (qApp != nullptr && qApp->style() != nullptr) {
-        const QIcon styleIcon = qApp->style()->standardIcon(QStyle::SP_FileIcon);
-        if (!styleIcon.isNull()) {
-            cachedFallbackIcon = styleIcon;
-            return cachedFallbackIcon;
+    for (const QChar character : simplified) {
+        if (character.isLetterOrNumber()) {
+            return QString(character.toUpper());
         }
     }
+    return QStringLiteral("?");
+}
 
-    QPixmap pixmap(32, 32);
+QIcon genericCommandFallbackIcon(const QString& label = QString())
+{
+    static QHash<QString, QIcon> cachedFallbackIcons;
+    const QString glyph = genericCommandFallbackGlyph(label);
+    const auto cachedIt = cachedFallbackIcons.constFind(glyph);
+    if (cachedIt != cachedFallbackIcons.constEnd()) {
+        return cachedIt.value();
+    }
+
+    QPixmap pixmap(36, 36);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor(QStringLiteral("#7c8a9a")), 1.4));
-    painter.setBrush(QColor(QStringLiteral("#2b3542")));
-    painter.drawRoundedRect(QRectF(3.0, 3.0, 26.0, 26.0), 5.0, 5.0);
+    QLinearGradient fillGradient(QPointF(5.0, 4.0), QPointF(31.0, 32.0));
+    fillGradient.setColorAt(0.0, QColor(QStringLiteral("#425061")));
+    fillGradient.setColorAt(1.0, QColor(QStringLiteral("#202832")));
+    painter.setPen(QPen(QColor(QStringLiteral("#8fa0b4")), 1.2));
+    painter.setBrush(fillGradient);
+    painter.drawRoundedRect(QRectF(4.5, 4.5, 27.0, 27.0), 7.0, 7.0);
+    painter.setPen(QPen(QColor(QStringLiteral("#dbe7f5")), 1.0));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawLine(QPointF(12.0, 11.0), QPointF(24.0, 11.0));
+    painter.drawLine(QPointF(12.0, 25.0), QPointF(24.0, 25.0));
     painter.setPen(QColor(QStringLiteral("#dfe6ef")));
     QFont font = painter.font();
     font.setBold(true);
-    font.setPointSize(12);
+    font.setPointSize(glyph.size() > 1 ? 10 : 13);
     painter.setFont(font);
-    painter.drawText(QRect(0, 0, 32, 32), Qt::AlignCenter, QStringLiteral("?"));
-    cachedFallbackIcon.addPixmap(pixmap);
-    return cachedFallbackIcon;
+    painter.drawText(QRect(0, 0, 36, 36), Qt::AlignCenter, glyph);
+    QIcon icon;
+    icon.addPixmap(pixmap);
+    cachedFallbackIcons.insert(glyph, icon);
+    return icon;
 }
 
 QString commandIconCacheKey(const CommandTabCommandEntry& command)
@@ -306,7 +324,10 @@ QIcon loadCommandEntryIcon(const CommandTabCommandEntry& command)
         QStringLiteral("icon-fallback"),
         QStringLiteral("Using generic fallback icon for '%1'").arg(command.id)
     );
-    const QIcon fallbackIcon = genericCommandFallbackIcon();
+    const QString fallbackLabel = command.text.trimmed().isEmpty()
+        ? command.id
+        : command.text;
+    const QIcon fallbackIcon = genericCommandFallbackIcon(fallbackLabel);
     if (!fallbackIcon.isNull()) {
         g_commandIconCache.insert(cacheKey, fallbackIcon);
     }

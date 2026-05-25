@@ -28,6 +28,7 @@ public:
 
         QFont nextFont = font();
         nextFont.setPointSize(std::max(7, scaledPx(10)));
+        m_baseFontPointSize = nextFont.pointSize();
         setFont(nextFont);
         m_iconOnlySize = defaultIconOnlySizeForButton();
 
@@ -217,6 +218,7 @@ public:
         m_surfaceTransparent = nextSurfaceTransparent;
         QFont nextFont = font();
         nextFont.setPointSize(nextFontSize);
+        m_baseFontPointSize = nextFontSize;
         setFont(nextFont);
         if (!geometryChanged) {
             update();
@@ -363,7 +365,7 @@ protected:
 #endif
     {
         m_hovered = true;
-        update();
+        repaint();
         QWidget::enterEvent(event);
     }
 
@@ -450,7 +452,7 @@ protected:
         if (event->button() == Qt::LeftButton) {
             m_pressed = true;
             m_dropdownPressed = hasMenuCommands() && dropdownHotZoneRect().contains(event->pos());
-            update();
+            repaint();
             event->accept();
             return;
         }
@@ -466,7 +468,7 @@ protected:
         m_pressed = false;
         m_dropdownPressed = false;
         m_dropdownHovered = hasMenuCommands() && rect().contains(event->pos()) && dropdownHotZoneRect().contains(event->pos());
-        update();
+        repaint();
         if (shouldTrigger) {
             if (shouldShowMenu) {
                 showMenu();
@@ -611,40 +613,85 @@ private:
 
     void recomputeLayout()
     {
-        const QFontMetrics metrics(font());
+        const int basePointSize = std::max(7, m_baseFontPointSize > 0 ? m_baseFontPointSize : font().pointSize());
+        const int minimumFitPointSize = std::max(7, basePointSize - 2);
+
+        auto linesFitWidth = [](const QStringList& lines, const QFontMetrics& metrics, int textWidth) {
+            for (const auto& line : lines) {
+                if (metrics.horizontalAdvance(line) > textWidth) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        auto wrappedLinesForMetrics = [this, &linesFitWidth](const QFontMetrics& metrics, int textWidth) {
+            const int safeTextWidth = std::max(scaledPx(32), textWidth);
+            if (m_buttonSize == CommandTabButtonSizeKind::Large) {
+                return wrapCommandTabTextToWidth(m_rawText, metrics, safeTextWidth, maxDisplayLines());
+            }
+
+            const QStringList exactLines = wrapCommandTabTextExact(m_rawText, metrics, safeTextWidth);
+            if (exactLines.size() <= maxDisplayLines() && linesFitWidth(exactLines, metrics, safeTextWidth)) {
+                return exactLines;
+            }
+            return wrapCommandTabSmallText(m_rawText, metrics, safeTextWidth, maxDisplayLines());
+        };
+        auto applyFittedFont = [this](int pointSize) {
+            if (font().pointSize() == pointSize) {
+                return;
+            }
+            QFont fittedFont = font();
+            fittedFont.setPointSize(pointSize);
+            setFont(fittedFont);
+        };
+
+        int selectedPointSize = basePointSize;
+        auto fitLines = [&](int textWidth) {
+            QStringList bestLines;
+            int bestPointSize = basePointSize;
+            for (int pointSize = basePointSize; pointSize >= minimumFitPointSize; --pointSize) {
+                QFont trialFont = font();
+                trialFont.setPointSize(pointSize);
+                const QFontMetrics trialMetrics(trialFont);
+                const QStringList candidateLines = wrappedLinesForMetrics(trialMetrics, textWidth);
+                if (bestLines.isEmpty() || commandtabLinesElided(bestLines)) {
+                    bestLines = candidateLines;
+                    bestPointSize = pointSize;
+                }
+                if (!commandtabLinesElided(candidateLines) && linesFitWidth(candidateLines, trialMetrics, textWidth)) {
+                    bestLines = candidateLines;
+                    bestPointSize = pointSize;
+                    break;
+                }
+            }
+            selectedPointSize = bestPointSize;
+            return bestLines;
+        };
+
         if (!m_textVisible) {
             m_textLines.clear();
         } else if (m_buttonSize == CommandTabButtonSizeKind::Large) {
             const int textWidth = std::max(scaledPx(64), m_assignedWidth - scaledPx(18));
-            m_textLines = wrapCommandTabTextToWidth(m_rawText, metrics, textWidth, maxDisplayLines());
+            m_textLines = fitLines(textWidth);
         } else if (m_buttonSize == CommandTabButtonSizeKind::Medium) {
             const int textWidth = std::max(
                 scaledPx(56),
                 m_assignedWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8) - dropdownReservedWidth()
             );
-            const QStringList exactLines = wrapCommandTabTextExact(m_rawText, metrics, textWidth);
-            if (exactLines.size() <= maxDisplayLines()) {
-                m_textLines = exactLines;
-            } else {
-                m_textLines = wrapCommandTabSmallText(m_rawText, metrics, textWidth, maxDisplayLines());
-            }
+            m_textLines = fitLines(textWidth);
         } else {
             const int textWidth = std::max(
                 scaledPx(50),
                 m_assignedWidth - scaledPx(8) - compactIconBandWidth() - scaledPx(10) - scaledPx(8) - dropdownReservedWidth()
             );
-            const QStringList exactLines = wrapCommandTabTextExact(m_rawText, metrics, textWidth);
-            if (exactLines.size() <= maxDisplayLines()) {
-                m_textLines = exactLines;
-            } else {
-                m_textLines = wrapCommandTabSmallText(m_rawText, metrics, textWidth, maxDisplayLines());
-            }
+            m_textLines = fitLines(textWidth);
         }
 
         if (m_textVisible && m_textLines.isEmpty() && !m_rawText.isEmpty()) {
             m_textLines.push_back(m_rawText);
         }
 
+        applyFittedFont(m_textVisible ? selectedPointSize : basePointSize);
         m_displayText = m_textLines.join(QStringLiteral("\n"));
         m_preferredSize = computePreferredSize();
         setMinimumSize(QSize(0, 0));
@@ -1449,6 +1496,7 @@ QMenu::separator {
     int m_iconOnlySize = 20;
     int m_compactButtonPadding = 3;
     int m_displayScalePercent = 100;
+    int m_baseFontPointSize = 10;
     QString m_surfaceStyle = QStringLiteral("glass");
     bool m_surfaceTransparent = false;
     CommandTabButtonSizeKind m_buttonSize = CommandTabButtonSizeKind::Small;

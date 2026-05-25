@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QDialog>
 #include <QDockWidget>
+#include <QElapsedTimer>
 #include <QEnterEvent>
 #include <QFile>
 #include <QFileDialog>

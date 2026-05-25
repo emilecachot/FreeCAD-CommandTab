@@ -56,6 +56,10 @@ public:
 
         setObjectName(QStringLiteral("FreeCADCommandTabNativeShell"));
         setAttribute(Qt::WA_StyledBackground, true);
+        m_interactionClock.start();
+        if (qApp != nullptr) {
+            qApp->installEventFilter(this);
+        }
         applyThemeStyleSheet();
 
         auto* outerLayout = new QVBoxLayout(this);
@@ -186,6 +190,13 @@ public:
             showWorkbenchTabPopup(index);
         });
         updateTabNavigationButtons();
+    }
+
+    ~CommandTabShellWidget() override
+    {
+        if (qApp != nullptr) {
+            qApp->removeEventFilter(this);
+        }
     }
 
     QString translatedShellText(const char* text) const
@@ -2831,14 +2842,19 @@ QWidget#CommandTabWorkbenchViewport {
         }
 
         pageState.chunkScheduled = true;
-        const int delayMs =
-            (m_stack != nullptr && m_stack->currentIndex() == index) ? 0 : 8;
+        const bool currentPage = (m_stack != nullptr && m_stack->currentIndex() == index);
+        const int delayMs = currentPage ? 0 : 28;
         QTimer::singleShot(delayMs, this, [this, index]() {
             if (index < 0 || index >= m_pageBuildStates.size()) {
                 return;
             }
+            const bool currentPage = (m_stack != nullptr && m_stack->currentIndex() == index);
             m_pageBuildStates[index].chunkScheduled = false;
-            buildWorkbenchPageChunk(index, 5);
+            if (!currentPage && shouldYieldBackgroundRibbonWork(120)) {
+                scheduleWorkbenchPageChunk(index);
+                return;
+            }
+            buildWorkbenchPageChunk(index, currentPage ? 5 : 2);
         });
     }
 
@@ -2896,13 +2912,41 @@ QWidget#CommandTabWorkbenchViewport {
         }
     }
 
-    void scheduleBackgroundPageWarmup()
+    void markRibbonInteraction()
+    {
+        if (!m_interactionClock.isValid()) {
+            m_interactionClock.start();
+        }
+        m_lastRibbonInteractionMs = m_interactionClock.elapsed();
+    }
+
+    bool isRibbonEventTarget(QObject* watched) const
+    {
+        if (watched == this) {
+            return true;
+        }
+        const auto* watchedWidget = qobject_cast<const QWidget*>(watched);
+        return watchedWidget != nullptr && isAncestorOf(watchedWidget);
+    }
+
+    bool shouldYieldBackgroundRibbonWork(int quietMs) const
+    {
+        if (QApplication::mouseButtons() != Qt::NoButton) {
+            return true;
+        }
+        if (!m_interactionClock.isValid() || m_lastRibbonInteractionMs <= 0) {
+            return false;
+        }
+        return (m_interactionClock.elapsed() - m_lastRibbonInteractionMs) < quietMs;
+    }
+
+    void scheduleBackgroundPageWarmup(int delayMs = 60)
     {
         if (m_backgroundPageWarmupScheduled || m_workbenchEntries.size() <= 1) {
             return;
         }
         m_backgroundPageWarmupScheduled = true;
-        QTimer::singleShot(60, this, [this]() {
+        QTimer::singleShot(std::clamp(delayMs, 30, 800), this, [this]() {
             m_backgroundPageWarmupScheduled = false;
             continueBackgroundPageWarmup();
         });
@@ -2911,6 +2955,10 @@ QWidget#CommandTabWorkbenchViewport {
     void continueBackgroundPageWarmup()
     {
         if (m_workbenchEntries.size() <= 1) {
+            return;
+        }
+        if (shouldYieldBackgroundRibbonWork(120)) {
+            scheduleBackgroundPageWarmup(160);
             return;
         }
         const int currentIndex = (m_stack != nullptr) ? m_stack->currentIndex() : -1;
@@ -2936,13 +2984,13 @@ QWidget#CommandTabWorkbenchViewport {
             }
 
             m_backgroundWarmupCursor = candidateIndex + 1;
-            ensureWorkbenchPage(candidateIndex, 8, false);
-            scheduleBackgroundPageWarmup();
+            ensureWorkbenchPage(candidateIndex, 2, false);
+            scheduleBackgroundPageWarmup(120);
             return;
         }
     }
 
-    void scheduleFullPagePreload()
+    void scheduleFullPagePreload(int delayMs = 90)
     {
         if (m_fullPagePreloadCompleted || m_workbenchEntries.size() <= 1) {
             return;
@@ -2951,7 +2999,7 @@ QWidget#CommandTabWorkbenchViewport {
             return;
         }
         m_fullPagePreloadScheduled = true;
-        QTimer::singleShot(0, this, [this]() {
+        QTimer::singleShot(std::clamp(delayMs, 30, 1200), this, [this]() {
             m_fullPagePreloadScheduled = false;
             continueFullPagePreload();
         });
@@ -3000,7 +3048,11 @@ QWidget#CommandTabWorkbenchViewport {
 
     void continueIconPreload()
     {
-        const int budget = 24;
+        if (shouldYieldBackgroundRibbonWork(80)) {
+            scheduleIconPreload(120);
+            return;
+        }
+        const int budget = 8;
         int processed = 0;
         while (m_iconPreloadCursor < m_iconPreloadQueue.size() && processed < budget) {
             loadCommandEntryIcon(m_iconPreloadQueue.at(m_iconPreloadCursor));
@@ -3008,7 +3060,7 @@ QWidget#CommandTabWorkbenchViewport {
             ++processed;
         }
         if (m_iconPreloadCursor < m_iconPreloadQueue.size()) {
-            scheduleIconPreload(1);
+            scheduleIconPreload(18);
         }
     }
 
@@ -3017,6 +3069,10 @@ QWidget#CommandTabWorkbenchViewport {
         const int count = static_cast<int>(m_workbenchEntries.size());
         if (count <= 1) {
             m_fullPagePreloadCompleted = true;
+            return;
+        }
+        if (shouldYieldBackgroundRibbonWork(140)) {
+            scheduleFullPagePreload(180);
             return;
         }
 
@@ -3028,9 +3084,12 @@ QWidget#CommandTabWorkbenchViewport {
             if (m_workbenchPagesBuilt.at(index)) {
                 continue;
             }
+            if (index < m_pageBuildStates.size() && m_pageBuildStates[index].chunkScheduled) {
+                continue;
+            }
             m_fullPagePreloadCursor = index + 1;
-            ensureWorkbenchPage(index, 100000, false);
-            scheduleFullPagePreload();
+            ensureWorkbenchPage(index, 2, false);
+            scheduleFullPagePreload(120);
             return;
         }
 
@@ -4443,6 +4502,21 @@ QWidget#CommandTabWorkbenchViewport {
     bool eventFilter(QObject* watched, QEvent* e) override
     {
         if (
+            e != nullptr
+            && (
+                e->type() == QEvent::MouseMove
+                || e->type() == QEvent::MouseButtonPress
+                || e->type() == QEvent::MouseButtonRelease
+                || e->type() == QEvent::Enter
+                || e->type() == QEvent::HoverEnter
+                || e->type() == QEvent::HoverMove
+            )
+            && isRibbonEventTarget(watched)
+        ) {
+            markRibbonInteraction();
+        }
+
+        if (
             watched != nullptr
             && e != nullptr
             && (e->type() == QEvent::Resize || e->type() == QEvent::Show || e->type() == QEvent::Polish)
@@ -4490,6 +4564,20 @@ QWidget#CommandTabWorkbenchViewport {
 
     bool event(QEvent* e) override
     {
+        if (
+            e != nullptr
+            && (
+                e->type() == QEvent::MouseMove
+                || e->type() == QEvent::MouseButtonPress
+                || e->type() == QEvent::MouseButtonRelease
+                || e->type() == QEvent::Enter
+                || e->type() == QEvent::HoverEnter
+                || e->type() == QEvent::HoverMove
+            )
+        ) {
+            markRibbonInteraction();
+        }
+
         if (e->type() == QEvent::Leave) {
             if (m_settingsState.ribbonAutoHide && !m_ribbonCollapsed
                 && !rect().contains(mapFromGlobal(QCursor::pos()))) {
@@ -4638,6 +4726,8 @@ private:
     bool m_updatingTabScrollButtonLayout = false;
     int m_adaptiveDensityLevel = 0;
     bool m_applyingDisplayScaleMetrics = false;
+    QElapsedTimer m_interactionClock;
+    qint64 m_lastRibbonInteractionMs = 0;
 
 public:
     int recommendedDockHeight() const
