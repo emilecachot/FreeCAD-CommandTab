@@ -318,6 +318,10 @@ def test_ondsel_defaults_can_be_disabled() -> None:
     assert "ApplyOndselDefaults" in parameters_text
     assert "APPLY_ONDSEL_DEFAULTS" in bootstrap_text
     assert "_apply_ondsel_defaults_once()" in bootstrap_text
+    assert "ONDSEL_DEFAULTS_BACKUP_KEY" in bootstrap_text
+    assert "_restore_ondsel_defaults_if_disabled()" in bootstrap_text
+    assert "backup_key=ONDSEL_DEFAULTS_BACKUP_KEY" in bootstrap_text
+    assert "current_value != entry.get(\"target\")" in bootstrap_text
     assert "applyOndselDefaults" in bridge_text
     assert "applyOndselDefaults" in model_text
     assert "Apply Ondsel defaults at startup" in dialog_text

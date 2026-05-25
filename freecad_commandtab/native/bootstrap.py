@@ -75,6 +75,8 @@ THEME_SANITIZED_CACHE_ROOT = os.path.join(
 )
 THEME_APPLIED_KEY = "ThemeBootstrapVersion"
 ONDSEL_DEFAULTS_APPLIED_KEY = "OndselDefaultsBootstrapVersion"
+ONDSEL_DEFAULTS_BACKUP_KEY = "OndselDefaultsBackupJson"
+ONDSEL_DEFAULTS_RESTORED_KEY = "OndselDefaultsRestoredVersion"
 THEME_MODE_KEY = "ThemeBootstrapMode"
 THEME_VERSION = "Theme-bootstrap-20260403"
 ONDSEL_DEFAULTS_VERSION = "Ondsel-defaults-bootstrap-20260413"
@@ -468,6 +470,128 @@ def _parameter_group_from_parts(parts: list[str]):
     return App.ParamGet(path)
 
 
+def _parameter_entry_type(node_tag: str) -> str:
+    return {
+        "FCBool": "Boolean",
+        "FCInt": "Integer",
+        "FCUInt": "Unsigned Long",
+        "FCFloat": "Float",
+        "FCText": "String",
+    }.get(str(node_tag or ""), "")
+
+
+def _parameter_value_exists(group, entry_type: str, name: str) -> bool:
+    try:
+        for content_type, content_name, *_ in group.GetContents():
+            if content_type == entry_type and content_name == name:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _get_parameter_value(group, entry_type: str, name: str):
+    if entry_type == "Boolean":
+        return bool(group.GetBool(name))
+    if entry_type == "Integer":
+        return int(group.GetInt(name))
+    if entry_type == "Unsigned Long":
+        return int(group.GetUnsigned(name))
+    if entry_type == "Float":
+        return float(group.GetFloat(name))
+    if entry_type == "String":
+        return str(group.GetString(name))
+    return None
+
+
+def _set_parameter_value(group, entry_type: str, name: str, value) -> None:
+    if entry_type == "Boolean":
+        group.SetBool(name, bool(value))
+        return
+    if entry_type == "Integer":
+        group.SetInt(name, int(value))
+        return
+    if entry_type == "Unsigned Long":
+        group.SetUnsigned(name, int(value))
+        return
+    if entry_type == "Float":
+        group.SetFloat(name, float(value))
+        return
+    if entry_type == "String":
+        group.SetString(name, str(value))
+
+
+def _remove_parameter_value(group, entry_type: str, name: str) -> None:
+    remover = {
+        "Boolean": "RemBool",
+        "Integer": "RemInt",
+        "Unsigned Long": "RemUnsigned",
+        "Float": "RemFloat",
+        "String": "RemString",
+    }.get(entry_type)
+    if not remover:
+        return
+    try:
+        getattr(group, remover)(name)
+    except Exception:
+        pass
+
+
+def _value_from_preferences_node(node_tag: str, value, text):
+    if node_tag == "FCBool":
+        return str(value).strip().lower() in ["1", "true", "yes", "on"]
+    if node_tag in {"FCInt", "FCUInt"}:
+        return int(str(value).strip() or "0")
+    if node_tag == "FCFloat":
+        return float(str(value).strip() or "0")
+    if node_tag == "FCText":
+        return str(value if value is not None else (text or ""))
+    return None
+
+
+def _collect_preferences_leaf_entries(node, path_parts: list[str], should_apply_leaf=None) -> list[dict]:
+    name = str(node.attrib.get("Name", "")).strip()
+    if node.tag == "FCParamGroup":
+        next_parts = list(path_parts)
+        if name and name != "Root":
+            next_parts.append(name)
+        entries: list[dict] = []
+        for child in list(node):
+            entries.extend(
+                _collect_preferences_leaf_entries(
+                    child, next_parts, should_apply_leaf
+                )
+            )
+        return entries
+
+    if not name:
+        return []
+
+    node_value = node.attrib.get("Value")
+    if callable(should_apply_leaf):
+        try:
+            if should_apply_leaf(path_parts, node.tag, name, node_value, node.text) is False:
+                return []
+        except Exception:
+            return []
+
+    entry_type = _parameter_entry_type(node.tag)
+    if entry_type == "":
+        return []
+
+    try:
+        target_value = _value_from_preferences_node(node.tag, node_value, node.text)
+    except Exception:
+        return []
+
+    return [{
+        "path": list(path_parts),
+        "type": entry_type,
+        "name": name,
+        "target": target_value,
+    }]
+
+
 def _apply_open_preferences_group(node, path_parts: list[str], should_apply_leaf=None) -> None:
     name = str(node.attrib.get("Name", "")).strip()
     if node.tag == "FCParamGroup":
@@ -523,6 +647,7 @@ def _apply_preferences_cfg_once(
     applied_version: str,
     *,
     should_apply_leaf=None,
+    backup_key: str = "",
 ) -> None:
     if os.path.isfile(cfg_path) is False:
         return
@@ -536,11 +661,114 @@ def _apply_preferences_cfg_once(
     except Exception:
         return
 
+    if backup_key:
+        _save_preferences_backup(
+            backup_key,
+            _collect_preferences_leaf_entries(root, [], should_apply_leaf),
+        )
+
     for child in list(root):
         _apply_open_preferences_group(child, [], should_apply_leaf)
 
     COMMANDTAB_PREFERENCES.SetString(applied_key, applied_version)
+    if backup_key:
+        COMMANDTAB_PREFERENCES.SetString(ONDSEL_DEFAULTS_RESTORED_KEY, "")
     App.saveParameter()
+
+
+def _save_preferences_backup(backup_key: str, entries: list[dict]) -> None:
+    backup = {
+        "version": ONDSEL_DEFAULTS_VERSION,
+        "entries": [],
+    }
+
+    for entry in entries:
+        try:
+            group = _parameter_group_from_parts(list(entry.get("path") or []))
+            entry_type = str(entry.get("type") or "")
+            name = str(entry.get("name") or "")
+            exists = _parameter_value_exists(group, entry_type, name)
+            backup["entries"].append({
+                "path": list(entry.get("path") or []),
+                "type": entry_type,
+                "name": name,
+                "exists": bool(exists),
+                "value": _get_parameter_value(group, entry_type, name) if exists else None,
+            })
+        except Exception:
+            continue
+
+    try:
+        COMMANDTAB_PREFERENCES.SetString(backup_key, json.dumps(backup, separators=(",", ":")))
+    except Exception:
+        pass
+
+
+def _load_ondsel_defaults_entries() -> list[dict]:
+    if os.path.isfile(ONDSEL_DEFAULTS_CFG) is False:
+        return []
+    try:
+        root = ET.parse(ONDSEL_DEFAULTS_CFG).getroot()
+    except Exception:
+        return []
+    return _collect_preferences_leaf_entries(root, [], _ondsel_defaults_should_apply)
+
+
+def _restore_preferences_backup(backup_payload: dict) -> bool:
+    restored_any = False
+    for entry in list(backup_payload.get("entries") or []):
+        try:
+            group = _parameter_group_from_parts(list(entry.get("path") or []))
+            entry_type = str(entry.get("type") or "")
+            name = str(entry.get("name") or "")
+            if bool(entry.get("exists")):
+                _set_parameter_value(group, entry_type, name, entry.get("value"))
+            else:
+                _remove_parameter_value(group, entry_type, name)
+            restored_any = True
+        except Exception:
+            continue
+    return restored_any
+
+
+def _restore_ondsel_defaults_fallback(entries: list[dict]) -> bool:
+    restored_any = False
+    for entry in entries:
+        try:
+            group = _parameter_group_from_parts(list(entry.get("path") or []))
+            entry_type = str(entry.get("type") or "")
+            name = str(entry.get("name") or "")
+            if _parameter_value_exists(group, entry_type, name) is False:
+                continue
+            current_value = _get_parameter_value(group, entry_type, name)
+            if current_value != entry.get("target"):
+                continue
+            _remove_parameter_value(group, entry_type, name)
+            restored_any = True
+        except Exception:
+            continue
+    return restored_any
+
+
+def _restore_ondsel_defaults_if_disabled() -> None:
+    with StartupTrace.span("bootstrap.restore_ondsel_defaults_if_disabled"):
+        if COMMANDTAB_PREFERENCES.GetString(ONDSEL_DEFAULTS_RESTORED_KEY).strip() == ONDSEL_DEFAULTS_VERSION:
+            return
+
+        restored_any = False
+        backup_raw = COMMANDTAB_PREFERENCES.GetString(ONDSEL_DEFAULTS_BACKUP_KEY).strip()
+        if backup_raw:
+            try:
+                restored_any = _restore_preferences_backup(json.loads(backup_raw))
+            except Exception:
+                restored_any = False
+
+        if restored_any is False:
+            restored_any = _restore_ondsel_defaults_fallback(_load_ondsel_defaults_entries())
+
+        COMMANDTAB_PREFERENCES.SetString(ONDSEL_DEFAULTS_APPLIED_KEY, "")
+        COMMANDTAB_PREFERENCES.SetString(ONDSEL_DEFAULTS_RESTORED_KEY, ONDSEL_DEFAULTS_VERSION)
+        App.saveParameter()
 
 
 def _ondsel_defaults_should_apply(path_parts: list[str], node_tag: str, name: str, _value, _text) -> bool:
@@ -633,6 +861,7 @@ def _apply_ondsel_defaults_once() -> None:
             ONDSEL_DEFAULTS_APPLIED_KEY,
             ONDSEL_DEFAULTS_VERSION,
             should_apply_leaf=_ondsel_defaults_should_apply,
+            backup_key=ONDSEL_DEFAULTS_BACKUP_KEY,
         )
 
 
@@ -737,9 +966,14 @@ def _apply_native_commandtab_theme_stylesheet() -> None:
 
 def apply_theme_preferences() -> None:
     with StartupTrace.span("bootstrap.apply_theme_preferences"):
+        apply_ondsel_defaults = bool(
+            getattr(Parameters_CommandTab, "APPLY_ONDSEL_DEFAULTS", True)
+        )
+        if apply_ondsel_defaults is False:
+            _restore_ondsel_defaults_if_disabled()
         if Parameters_CommandTab.MODERN_COMMANDTAB_STYLE_ENABLED is not True:
             return
-        if bool(getattr(Parameters_CommandTab, "APPLY_ONDSEL_DEFAULTS", True)) is True:
+        if apply_ondsel_defaults is True:
             _apply_ondsel_defaults_once()
         _ensure_sketcher_display_defaults()
         if os.path.isdir(THEME_ROOT) is False:
