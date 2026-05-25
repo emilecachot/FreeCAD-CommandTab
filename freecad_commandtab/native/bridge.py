@@ -68,11 +68,11 @@ _AVAILABLE_WORKBENCHES_CACHE: dict[str, object] = {}
 _AVAILABLE_WORKBENCHES_CACHE_VALID = False
 _AVAILABLE_WORKBENCHES_CACHE_TS = 0.0
 _BASE_MODEL_CACHE: dict[str, object] = {}
-_WORKBENCH_PANEL_CACHE: dict[tuple[tuple[str, int, int], str], list[dict]] = {}
-_WORKBENCH_PAYLOAD_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, str], str] = {}
-_MODEL_PAYLOAD_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, bool, str], str] = {}
-_BOOTSTRAP_PAYLOAD_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, bool, str], str] = {}
-_WORKBENCH_BOOTSTRAP_CACHE: dict[tuple[tuple[str, int, int], tuple[str, str], str, str], str] = {}
+_WORKBENCH_PANEL_CACHE: dict[tuple[tuple[str, str, int], str], list[dict]] = {}
+_WORKBENCH_PAYLOAD_CACHE: dict[tuple[tuple[str, str, int], tuple[str, str], str, str], str] = {}
+_MODEL_PAYLOAD_CACHE: dict[tuple[tuple[str, str, int], tuple[str, str], str, bool, str], str] = {}
+_BOOTSTRAP_PAYLOAD_CACHE: dict[tuple[tuple[str, str, int], tuple[str, str], str, bool, str], str] = {}
+_WORKBENCH_BOOTSTRAP_CACHE: dict[tuple[tuple[str, str, int], tuple[str, str], str, str], str] = {}
 _WORKBENCH_BOOTSTRAP_STATE_CACHE: dict[str, dict[str, object]] = {}
 _VARIANT_MENU_CACHE_MEMORY: dict[str, object] = {}
 _STATIC_COMMAND_VARIANT_MENU_CACHE: dict[str, list[object]] | None = None
@@ -2939,6 +2939,20 @@ def _is_stable_icon_reference(icon_path: str) -> bool:
         return False
 
 
+def _cached_command_metadata_is_complete(command_payload: dict) -> bool:
+    payload = _coerce_dict(command_payload)
+    if str(payload.get("text") or "").strip() == "":
+        return False
+
+    # Some FreeCAD commands legitimately expose no icon. Cache that negative
+    # lookup, including absent iconPath, instead of rebuilding at every startup.
+    if "iconPath" not in payload:
+        return True
+
+    icon_path = str(payload.get("iconPath") or "").strip()
+    return icon_path == "" or _is_stable_icon_reference(icon_path)
+
+
 def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = False) -> str:
     theme_signature = "|".join(_native_theme_signature())
     output_path = (
@@ -4258,9 +4272,9 @@ def _migrate_renamed_toolbars(structure: dict) -> bool:
     """
     One-time structural migration: reconcile ordered toolbar entries with orphan
     entries that arose when FreeCAD renamed built-in toolbars between versions
-    (e.g. "Mesh tools" → "Mesh Tools", "Part tools" → "Part Tools").
+    (e.g. "Mesh tools" -> "Mesh Tools", "Part tools" -> "Part Tools").
 
-    Decision logic per matched pair (ordered ↔ orphan):
+    Decision logic per matched pair (ordered <-> orphan):
     - orphan has MORE commands: orphan carries fresh FreeCAD data; promote it by
       replacing the ordered entry key with the orphan's name in both the toolbars
       dict and the order array, then discard the stale ordered entry.
@@ -4281,7 +4295,7 @@ def _migrate_renamed_toolbars(structure: dict) -> bool:
 
         order_set: set[str] = {str(x) for x in order if str(x or "").strip()}
 
-        # Index ordered entries: norm_name → id, id → frozenset(cmds)
+        # Index ordered entries: norm_name -> id, id -> frozenset(cmds)
         ordered_norm_to_id: dict[str, str] = {}
         ordered_cmd_index: dict[str, frozenset] = {}
         for tb_id in list(order_set):
@@ -4349,17 +4363,18 @@ def _migrate_renamed_toolbars(structure: dict) -> bool:
     return dirty
 
 
-def _load_structure() -> tuple[tuple[str, int, int], dict]:
+def _load_structure() -> tuple[tuple[str, str, int], dict]:
     global _LOADED_STRUCTURE_LANGUAGE
 
     structure_path = _resolve_structure_path()
-    stat_result = structure_path.stat()
-    cache_key = (str(structure_path), int(stat_result.st_mtime_ns), int(stat_result.st_size))
+    structure_bytes = structure_path.read_bytes()
+    structure_digest = hashlib.sha1(structure_bytes).hexdigest()
+    cache_key = (str(structure_path), structure_digest, len(structure_bytes))
 
     if _STRUCTURE_CACHE.get("key") == cache_key:
         return cache_key, _STRUCTURE_CACHE["data"]  # type: ignore[index]
 
-    structure = json.loads(structure_path.read_text(encoding="utf-8"))
+    structure = json.loads(structure_bytes.decode("utf-8"))
     _LOADED_STRUCTURE_LANGUAGE = str(structure.get("language") or "").strip()
 
     if _migrate_renamed_toolbars(structure):
@@ -4368,8 +4383,9 @@ def _load_structure() -> tuple[tuple[str, int, int], dict]:
                 json.dumps(structure, indent=4, ensure_ascii=False),
                 encoding="utf-8",
             )
-            stat_result = structure_path.stat()
-            cache_key = (str(structure_path), int(stat_result.st_mtime_ns), int(stat_result.st_size))
+            structure_bytes = structure_path.read_bytes()
+            structure_digest = hashlib.sha1(structure_bytes).hexdigest()
+            cache_key = (str(structure_path), structure_digest, len(structure_bytes))
         except Exception:
             pass
 
@@ -4686,7 +4702,7 @@ def _resolved_command_display_text(command_name: str, command_data: dict, comman
         return _humanized_command_id(command_name) if resolved_is_technical else resolved_text
 
     # If the structure was saved in a different language, stored labels are stale
-    # defaults from the old locale — always use the current translation.
+    # defaults from the old locale; always use the current translation.
     if not _structure_language_matches_current():
         if resolved_text != "" and resolved_is_technical is False:
             return resolved_text
@@ -4702,7 +4718,7 @@ def _resolved_command_display_text(command_name: str, command_data: dict, comman
 
 
 _PANEL_TITLE_OVERRIDES: dict[str, str] = {
-    # Normalised panel id → clean display title.
+    # Normalised panel id -> clean display title.
     # These cover FreeCAD toolbar names that are either too verbose or had
     # inconsistent capitalisation across versions.
     "individual views": "Views",
@@ -5278,7 +5294,7 @@ def _toolbar_panels_likely_duplicate(
 
 
 def _build_workbench_panels(
-    structure_key: tuple[str, int, int], structure: dict, workbench_name: str
+    structure_key: tuple[str, str, int], structure: dict, workbench_name: str
 ) -> list[dict]:
     cache_key = (structure_key, workbench_name)
     cached_value = _WORKBENCH_PANEL_CACHE.get(cache_key)
@@ -5465,7 +5481,7 @@ def _build_workbench_panels(
     return panels
 
 
-def _build_base_model() -> tuple[tuple[str, int, int], dict, dict]:
+def _build_base_model() -> tuple[tuple[str, str, int], dict, dict]:
     _ensure_runtime_icon_cache_matches_theme()
     structure_key, structure = _load_structure()
     if _BASE_MODEL_CACHE.get("key") == structure_key:
@@ -5990,6 +6006,19 @@ def _load_matching_metadata_cache(
         or cached_payload.get("themeSignature") != theme_signature
         or str(cached_payload.get("environmentSignature") or "") != environment_signature
     ):
+        StartupTrace.mark(
+            "bridge.native_metadata_cache_rejected",
+            versionMatches=bool(cached_version == _NATIVE_METADATA_CACHE_VERSION),
+            structureMatches=bool(cached_payload.get("structureKey") == expected_structure_key),
+            themeMatches=bool(cached_payload.get("themeSignature") == theme_signature),
+            environmentMatches=bool(
+                str(cached_payload.get("environmentSignature") or "") == environment_signature
+            ),
+            cachedStructureKey=str(cached_payload.get("structureKey") or ""),
+            expectedStructureKey=str(expected_structure_key),
+            cachedEnvironmentSignature=str(cached_payload.get("environmentSignature") or ""),
+            expectedEnvironmentSignature=environment_signature,
+        )
         return None
 
     commands_payload = cached_payload.get("commands", {})
@@ -6048,7 +6077,7 @@ def _coerce_metadata_cache_payload(payload) -> dict | None:
 
 
 def _ensure_native_metadata_cache(
-    structure_key: tuple[str, int, int],
+    structure_key: tuple[str, str, int],
     structure: dict,
     required_workbenches: set[str] | None = None,
     include_quick_access: bool = True,
@@ -6152,9 +6181,8 @@ def _ensure_native_metadata_cache(
             missing_command_metadata: set[str] = {
                 command_name
                 for command_name in target_command_ids
-                if str(_coerce_dict(commands_payload.get(command_name)).get("text") or "") == ""
-                or _is_stable_icon_reference(
-                    str(_coerce_dict(commands_payload.get(command_name)).get("iconPath") or "")
+                if _cached_command_metadata_is_complete(
+                    _coerce_dict(commands_payload.get(command_name))
                 )
                 is False
             }
@@ -6171,6 +6199,17 @@ def _ensure_native_metadata_cache(
                 )
             ):
                 return cache_path
+            StartupTrace.mark(
+                "bridge.native_metadata_cache_miss",
+                phase="pre_bootstrap",
+                missingWorkbenchTitleCount=len(missing_workbench_titles),
+                missingWorkbenchIconCount=len(missing_workbench_icons),
+                missingPanelTitleCount=len(missing_panel_titles),
+                missingCommandMetadataCount=len(missing_command_metadata),
+                missingWorkbenchCount=len(target_workbenches - built_workbenches),
+                quickAccessMissing=bool(include_quick_access is True and quick_access_cached is False),
+                environmentMatches=bool(cache_has_expected_environment_signature),
+            )
 
         should_build_persistent_bootstrap = (
             force is True
@@ -6242,9 +6281,8 @@ def _ensure_native_metadata_cache(
         missing_command_metadata = {
             command_name
             for command_name in target_command_ids
-            if str(_coerce_dict(commands_payload.get(command_name)).get("text") or "") == ""
-            or _is_stable_icon_reference(
-                str(_coerce_dict(commands_payload.get(command_name)).get("iconPath") or "")
+            if _cached_command_metadata_is_complete(
+                _coerce_dict(commands_payload.get(command_name))
             )
             is False
         }
@@ -6330,18 +6368,25 @@ def _ensure_native_metadata_cache(
                 quick_access_cached = True
 
         missing_commands: dict[str, dict] = {}
+        command_metadata_workbenches = (
+            target_workbenches if len(missing_command_metadata) > 0 else workbenches_to_build
+        )
+        command_metadata_include_quick_access = (
+            include_quick_access
+            if len(missing_command_metadata) > 0
+            else quick_access_to_build
+        )
         for command_name, command_data in _iter_structure_command_entries(
             structure,
-            workbench_names=workbenches_to_build,
-            include_quick_access=quick_access_to_build,
+            workbench_names=command_metadata_workbenches,
+            include_quick_access=command_metadata_include_quick_access,
         ):
             if _is_separator_command_id(command_name):
                 continue
             command_payload = commands_payload.get(command_name)
             if (
                 isinstance(command_payload, dict)
-                and str(command_payload.get("text") or "") != ""
-                and str(command_payload.get("iconPath") or "") != ""
+                and _cached_command_metadata_is_complete(command_payload) is True
                 and force is False
             ):
                 continue
@@ -6581,7 +6626,7 @@ def _native_build_workbench_json(
 
 
 def _bootstrap_payload_cache_key(
-    structure_key: tuple[str, int, int],
+    structure_key: tuple[str, str, int],
     theme_signature: tuple[str, str],
     active_workbench: str,
     include_all_panels: bool,

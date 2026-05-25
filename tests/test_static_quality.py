@@ -253,6 +253,14 @@ def test_native_metadata_cache_tracks_freecad_environment_signature() -> None:
     assert "App.Version()" in bridge_text
     assert "_available_workbenches().keys()" in bridge_text
     assert '"environmentSignature"' in bridge_text
+    assert "def _cached_command_metadata_is_complete(command_payload: dict) -> bool:" in bridge_text
+    assert 'if "iconPath" not in payload:' in bridge_text
+    assert "including absent iconPath" in bridge_text
+    assert "icon_path == \"\" or _is_stable_icon_reference(icon_path)" in bridge_text
+    assert "command_metadata_workbenches = (" in bridge_text
+    assert "target_workbenches if len(missing_command_metadata) > 0 else workbenches_to_build" in bridge_text
+    assert "structure_digest = hashlib.sha1(structure_bytes).hexdigest()" in bridge_text
+    assert "cache_key = (str(structure_path), structure_digest, len(structure_bytes))" in bridge_text
 
 
 def test_ribbon_surface_settings_contract_present() -> None:
