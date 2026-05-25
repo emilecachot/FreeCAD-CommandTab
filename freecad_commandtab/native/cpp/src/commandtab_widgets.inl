@@ -220,6 +220,7 @@ public:
         nextFont.setPointSize(nextFontSize);
         m_baseFontPointSize = nextFontSize;
         setFont(nextFont);
+        invalidateIconPixmapCache();
         if (!geometryChanged) {
             update();
             return;
@@ -340,6 +341,7 @@ public:
             return;
         }
         m_icon = icon;
+        invalidateIconPixmapCache();
         update();
     }
 
@@ -698,6 +700,40 @@ private:
         resize(m_preferredSize);
         updateGeometry();
         update();
+    }
+
+    void invalidateIconPixmapCache() const
+    {
+        m_cachedIconPixmap = QPixmap();
+        m_cachedIconSize = QSize();
+        m_cachedIconEnabled = false;
+    }
+
+    void paintCachedIcon(QPainter* painter, const QRect& iconRect) const
+    {
+        if (painter == nullptr || m_icon.isNull() || iconRect.isEmpty()) {
+            return;
+        }
+
+        const QSize targetSize = iconRect.size();
+        const bool enabled = isEnabled();
+        if (
+            m_cachedIconPixmap.isNull()
+            || m_cachedIconSize != targetSize
+            || m_cachedIconEnabled != enabled
+        ) {
+            m_cachedIconPixmap = m_icon.pixmap(
+                targetSize,
+                enabled ? QIcon::Normal : QIcon::Disabled,
+                QIcon::Off
+            );
+            m_cachedIconSize = targetSize;
+            m_cachedIconEnabled = enabled;
+        }
+
+        if (!m_cachedIconPixmap.isNull()) {
+            painter->drawPixmap(iconRect, m_cachedIconPixmap);
+        }
     }
 
     QSize computePreferredSize() const
@@ -1077,9 +1113,7 @@ private:
                 scaledPx(4)
             );
         }
-        if (!m_icon.isNull()) {
-            m_icon.paint(painter, iconRect, Qt::AlignCenter, isEnabled() ? QIcon::Normal : QIcon::Disabled);
-        }
+        paintCachedIcon(painter, iconRect);
         if (hasMenuCommands()) {
             paintDropdownIndicator(
                 painter,
@@ -1106,7 +1140,7 @@ private:
         painter->drawText(
             textRect,
             Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
-            m_textLines.join(QStringLiteral("\n"))
+            m_displayText
         );
     }
 
@@ -1193,9 +1227,7 @@ private:
                 scaledPx(4)
             );
         }
-        if (!m_icon.isNull()) {
-            m_icon.paint(painter, iconRect, Qt::AlignCenter, isEnabled() ? QIcon::Normal : QIcon::Disabled);
-        }
+        paintCachedIcon(painter, iconRect);
         if (hasMenuCommands()) {
             const QRect dropdownRect = m_textVisible
                 ? QRect(
@@ -1482,6 +1514,9 @@ QMenu::separator {
 
     const CommandTabModel::CommandTabTheme* m_theme = nullptr;
     QIcon m_icon;
+    mutable QPixmap m_cachedIconPixmap;
+    mutable QSize m_cachedIconSize;
+    mutable bool m_cachedIconEnabled = false;
     QString m_commandId;
     QString m_rawText;
     QString m_displayText;

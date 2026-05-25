@@ -184,7 +184,9 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "startCommandStatePolling()" in shell_text
     assert "commandtabEnabledBindingCommandId" in shell_text
     assert "commandtabCheckedBindingCommandId" in shell_text
-    assert "m_commandStatePollTimer->setInterval(750)" in shell_text
+    assert "m_enabledWidgetsByCommandId" in shell_text
+    assert "m_checkedButtonsByCommandId" in shell_text
+    assert "m_commandStatePollTimer->setInterval(2000)" in shell_text
 
 
 def test_build_script_uses_release_config_by_default() -> None:
@@ -327,7 +329,7 @@ def test_native_background_preload_yields_to_ribbon_interaction() -> None:
         ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl"
     ).read_text(encoding="utf-8")
 
-    assert "qApp->installEventFilter(this)" in shell_text
+    assert "commandtabInteractionFilterInstalled" in shell_text
     assert "isRibbonEventTarget(watched)" in shell_text
     assert "shouldYieldBackgroundRibbonWork" in shell_text
     assert "ensureWorkbenchPage(index, 100000, false)" not in shell_text
@@ -345,6 +347,8 @@ def test_command_button_hover_and_labels_are_latency_aware() -> None:
     assert "minimumFitPointSize" in widget_text
     assert "linesFitWidth(candidateLines" in widget_text
     assert "repaint();" in widget_text
+    assert "paintCachedIcon" in widget_text
+    assert "m_cachedIconPixmap" in widget_text
 
 
 def test_command_icon_fallback_avoids_native_file_document_icon() -> None:

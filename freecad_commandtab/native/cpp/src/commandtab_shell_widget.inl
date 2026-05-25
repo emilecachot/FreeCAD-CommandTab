@@ -57,9 +57,6 @@ public:
         setObjectName(QStringLiteral("FreeCADCommandTabNativeShell"));
         setAttribute(Qt::WA_StyledBackground, true);
         m_interactionClock.start();
-        if (qApp != nullptr) {
-            qApp->installEventFilter(this);
-        }
         applyThemeStyleSheet();
 
         auto* outerLayout = new QVBoxLayout(this);
@@ -192,13 +189,6 @@ public:
         updateTabNavigationButtons();
     }
 
-    ~CommandTabShellWidget() override
-    {
-        if (qApp != nullptr) {
-            qApp->removeEventFilter(this);
-        }
-    }
-
     QString translatedShellText(const char* text) const
     {
         const QString sourceText = QString::fromUtf8(text);
@@ -262,6 +252,72 @@ public:
         m_actionsByCommandId.clear();
         m_missingActionCommandIds.clear();
         m_actionLookupReady = false;
+    }
+
+    void requestActionLookupRefresh() const
+    {
+        m_missingActionCommandIds.clear();
+        m_actionLookupReady = false;
+    }
+
+    template <typename WidgetT>
+    void pruneAndAppendCommandWidget(
+        QHash<QString, QVector<QPointer<WidgetT>>>& registry,
+        const QString& commandId,
+        WidgetT* widget
+    )
+    {
+        if (widget == nullptr) {
+            return;
+        }
+        const QString normalizedCommandId = normalizeActionCandidate(commandId);
+        if (normalizedCommandId.isEmpty()) {
+            return;
+        }
+        if (!widget->property("commandtabInteractionFilterInstalled").toBool()) {
+            widget->setProperty("commandtabInteractionFilterInstalled", true);
+            widget->installEventFilter(this);
+        }
+
+        auto& entries = registry[normalizedCommandId];
+        for (int index = entries.size() - 1; index >= 0; --index) {
+            if (entries.at(index).isNull()) {
+                entries.removeAt(index);
+                continue;
+            }
+            if (entries.at(index).data() == widget) {
+                return;
+            }
+        }
+        entries.push_back(QPointer<WidgetT>(widget));
+    }
+
+    void registerCommandButton(const QString& commandId, CommandTabCommandButton* button)
+    {
+        pruneAndAppendCommandWidget(m_commandButtonsById, commandId, button);
+    }
+
+    void registerCommandToolButton(const QString& commandId, QToolButton* button)
+    {
+        pruneAndAppendCommandWidget(m_commandToolButtonsById, commandId, button);
+    }
+
+    void registerEnabledWidget(const QString& commandId, QWidget* widget)
+    {
+        pruneAndAppendCommandWidget(m_enabledWidgetsByCommandId, commandId, widget);
+    }
+
+    void registerCheckedButton(const QString& commandId, CommandTabCommandButton* button)
+    {
+        pruneAndAppendCommandWidget(m_checkedButtonsByCommandId, commandId, button);
+    }
+
+    void clearRuntimeCommandWidgetRegistries()
+    {
+        m_enabledWidgetsByCommandId.clear();
+        m_checkedButtonsByCommandId.clear();
+        m_commandButtonsById.clear();
+        m_commandToolButtonsById.clear();
     }
 
     void rebuildActionLookup() const
@@ -371,6 +427,7 @@ public:
 
         const QString normalizedCommandId = normalizeActionCandidate(commandId);
         widget->setProperty("commandtabEnabledBindingCommandId", normalizedCommandId);
+        registerEnabledWidget(normalizedCommandId, widget);
         QAction* sourceAction = resolveActionForCommandId(commandId);
         if (sourceAction == nullptr) {
             widget->setEnabled(true);
@@ -379,7 +436,15 @@ public:
         }
 
         widget->setEnabled(sourceAction->isEnabled());
+        const quintptr actionKey = reinterpret_cast<quintptr>(sourceAction);
+        if (
+            widget->property("commandtabEnabledBindingConnected").toBool()
+            && widget->property("commandtabEnabledBindingActionKey").toULongLong() == static_cast<qulonglong>(actionKey)
+        ) {
+            return;
+        }
         widget->setProperty("commandtabEnabledBindingConnected", true);
+        widget->setProperty("commandtabEnabledBindingActionKey", static_cast<qulonglong>(actionKey));
         QPointer<QWidget> guardedWidget(widget);
         QPointer<QAction> guardedAction(sourceAction);
         connect(sourceAction, &QAction::changed, widget, [guardedWidget, guardedAction]() {
@@ -429,6 +494,7 @@ public:
 
         const QString normalizedCommandId = normalizeActionCandidate(commandId);
         button->setProperty("commandtabCheckedBindingCommandId", normalizedCommandId);
+        registerCheckedButton(normalizedCommandId, button);
         QAction* sourceAction = resolveActionForCommandId(commandId);
         if (sourceAction == nullptr) {
             button->setProperty("commandtabCheckedBindingConnected", false);
@@ -436,7 +502,15 @@ public:
         }
 
         button->setChecked(sourceAction->isChecked());
+        const quintptr actionKey = reinterpret_cast<quintptr>(sourceAction);
+        if (
+            button->property("commandtabCheckedBindingConnected").toBool()
+            && button->property("commandtabCheckedBindingActionKey").toULongLong() == static_cast<qulonglong>(actionKey)
+        ) {
+            return;
+        }
         button->setProperty("commandtabCheckedBindingConnected", true);
+        button->setProperty("commandtabCheckedBindingActionKey", static_cast<qulonglong>(actionKey));
         QPointer<CommandTabCommandButton> guardedButton(button);
         QPointer<QAction> guardedAction(sourceAction);
         connect(sourceAction, &QAction::changed, button, [guardedButton, guardedAction]() {
@@ -457,6 +531,7 @@ public:
         setUpdatesEnabled(false);
         clearLoadedIconCache();
         invalidateActionLookup();
+        clearRuntimeCommandWidgetRegistries();
         m_model = model;
         m_settingsState = model.settings;
         m_baseTheme = model.theme;
@@ -1127,53 +1202,34 @@ private:
 
     void refreshCommandIconsFromActions()
     {
-        invalidateActionLookup();
         rebuildActionLookup();
 
-        QList<QWidget*> scanRoots;
-        scanRoots.push_back(this);
-        if (m_topBarWidget != nullptr) {
-            scanRoots.push_back(m_topBarWidget);
-        }
-        if (m_stack != nullptr && m_stack->currentWidget() != nullptr) {
-            scanRoots.push_back(m_stack->currentWidget());
-        }
-
-        QSet<QWidget*> visitedRoots;
-        for (QWidget* root : scanRoots) {
-            if (root == nullptr || visitedRoots.contains(root)) {
+        for (auto registryIt = m_commandButtonsById.begin(); registryIt != m_commandButtonsById.end(); ++registryIt) {
+            QAction* sourceAction = resolveActionForCommandId(registryIt.key());
+            if (sourceAction == nullptr || sourceAction->icon().isNull()) {
                 continue;
             }
-            visitedRoots.insert(root);
-
-            const auto scopedWidgets = root->findChildren<QWidget*>();
-            for (auto* scopedWidget : scopedWidgets) {
-                auto* commandButton = dynamic_cast<CommandTabCommandButton*>(scopedWidget);
+            auto& buttons = registryIt.value();
+            for (int index = buttons.size() - 1; index >= 0; --index) {
+                auto* commandButton = buttons.at(index).data();
                 if (commandButton == nullptr) {
-                    continue;
-                }
-                const QString commandId = commandButton->property("commandtabCommandId").toString().trimmed();
-                if (commandId.isEmpty()) {
-                    continue;
-                }
-                QAction* sourceAction = resolveActionForCommandId(commandId);
-                if (sourceAction == nullptr || sourceAction->icon().isNull()) {
+                    buttons.removeAt(index);
                     continue;
                 }
                 commandButton->setIconOverride(sourceAction->icon());
             }
+        }
 
-            const auto toolButtons = root->findChildren<QToolButton*>();
-            for (auto* toolButton : toolButtons) {
+        for (auto registryIt = m_commandToolButtonsById.begin(); registryIt != m_commandToolButtonsById.end(); ++registryIt) {
+            QAction* sourceAction = resolveActionForCommandId(registryIt.key());
+            if (sourceAction == nullptr || sourceAction->icon().isNull()) {
+                continue;
+            }
+            auto& toolButtons = registryIt.value();
+            for (int index = toolButtons.size() - 1; index >= 0; --index) {
+                auto* toolButton = toolButtons.at(index).data();
                 if (toolButton == nullptr) {
-                    continue;
-                }
-                const QString commandId = toolButton->property("commandtabCommandId").toString().trimmed();
-                if (commandId.isEmpty()) {
-                    continue;
-                }
-                QAction* sourceAction = resolveActionForCommandId(commandId);
-                if (sourceAction == nullptr || sourceAction->icon().isNull()) {
+                    toolButtons.removeAt(index);
                     continue;
                 }
                 toolButton->setIcon(sourceAction->icon());
@@ -1192,63 +1248,42 @@ private:
 
     void refreshCommandStatesFromActions()
     {
-        invalidateActionLookup();
         rebuildActionLookup();
 
-        QList<QWidget*> scanRoots;
-        scanRoots.push_back(this);
-        if (m_topBarWidget != nullptr) {
-            scanRoots.push_back(m_topBarWidget);
-        }
-        if (m_stack != nullptr && m_stack->currentWidget() != nullptr) {
-            scanRoots.push_back(m_stack->currentWidget());
-        }
-
-        QSet<QWidget*> visitedRoots;
-        for (QWidget* root : scanRoots) {
-            if (root == nullptr || visitedRoots.contains(root)) {
+        for (auto registryIt = m_enabledWidgetsByCommandId.begin(); registryIt != m_enabledWidgetsByCommandId.end(); ++registryIt) {
+            QAction* sourceAction = resolveActionForCommandId(registryIt.key());
+            if (sourceAction == nullptr) {
                 continue;
             }
-            visitedRoots.insert(root);
-
-            const auto scopedWidgets = root->findChildren<QWidget*>();
-            for (auto* scopedWidget : scopedWidgets) {
-                if (scopedWidget == nullptr) {
+            auto& widgets = registryIt.value();
+            for (int index = widgets.size() - 1; index >= 0; --index) {
+                auto* widget = widgets.at(index).data();
+                if (widget == nullptr) {
+                    widgets.removeAt(index);
                     continue;
                 }
-
-                QString commandId = scopedWidget->property("commandtabEnabledBindingCommandId").toString().trimmed();
-                if (commandId.isEmpty()) {
-                    commandId = scopedWidget->property("commandtabCommandId").toString().trimmed();
+                widget->setEnabled(sourceAction->isEnabled());
+                if (!widget->property("commandtabEnabledBindingConnected").toBool()) {
+                    bindWidgetEnabledToCommand(widget, registryIt.key());
                 }
-                if (!commandId.isEmpty()) {
-                    QAction* sourceAction = resolveActionForCommandId(commandId);
-                    if (sourceAction != nullptr) {
-                        scopedWidget->setEnabled(sourceAction->isEnabled());
-                        if (!scopedWidget->property("commandtabEnabledBindingConnected").toBool()) {
-                            bindWidgetEnabledToCommand(scopedWidget, commandId);
-                        }
-                    }
-                }
+            }
+        }
 
-                auto* commandButton = dynamic_cast<CommandTabCommandButton*>(scopedWidget);
+        for (auto registryIt = m_checkedButtonsByCommandId.begin(); registryIt != m_checkedButtonsByCommandId.end(); ++registryIt) {
+            QAction* checkedAction = resolveActionForCommandId(registryIt.key());
+            if (checkedAction == nullptr) {
+                continue;
+            }
+            auto& buttons = registryIt.value();
+            for (int index = buttons.size() - 1; index >= 0; --index) {
+                auto* commandButton = buttons.at(index).data();
                 if (commandButton == nullptr) {
-                    continue;
-                }
-                QString checkedCommandId = commandButton->property("commandtabCheckedBindingCommandId").toString().trimmed();
-                if (checkedCommandId.isEmpty()) {
-                    checkedCommandId = commandButton->property("commandtabCommandId").toString().trimmed();
-                }
-                if (checkedCommandId.isEmpty()) {
-                    continue;
-                }
-                QAction* checkedAction = resolveActionForCommandId(checkedCommandId);
-                if (checkedAction == nullptr) {
+                    buttons.removeAt(index);
                     continue;
                 }
                 commandButton->setChecked(checkedAction->isChecked());
                 if (!commandButton->property("commandtabCheckedBindingConnected").toBool()) {
-                    bindWidgetCheckedToCommand(commandButton, checkedCommandId);
+                    bindWidgetCheckedToCommand(commandButton, registryIt.key());
                 }
             }
         }
@@ -1259,6 +1294,7 @@ private:
         if (passes <= 0) {
             return;
         }
+        requestActionLookupRefresh();
         m_pendingCommandIconRefreshPasses = std::max(m_pendingCommandIconRefreshPasses, passes);
         if (m_commandIconRefreshTimer == nullptr) {
             m_commandIconRefreshTimer = new QTimer(this);
@@ -1281,6 +1317,7 @@ private:
         if (passes <= 0) {
             return;
         }
+        requestActionLookupRefresh();
         m_pendingCommandStateRefreshPasses = std::max(m_pendingCommandStateRefreshPasses, passes);
         if (m_commandStateRefreshTimer == nullptr) {
             m_commandStateRefreshTimer = new QTimer(this);
@@ -1304,7 +1341,7 @@ private:
             return;
         }
         m_commandStatePollTimer = new QTimer(this);
-        m_commandStatePollTimer->setInterval(750);
+        m_commandStatePollTimer->setInterval(2000);
         connect(m_commandStatePollTimer, &QTimer::timeout, this, [this]() {
             refreshCommandStatesFromActions();
         });
@@ -3575,6 +3612,7 @@ QWidget#CommandTabWorkbenchViewport {
                 buildMonogramIcon(label, QSize(iconSize, iconSize), badgeBackground, badgeForeground)
             );
         }
+        registerCommandToolButton(command.id, button);
 
         const bool hasVariantMenu = attachVariantMenuToToolButton(button, command, panelKey, ownerMenu);
         const int variantMenuReserve = hasVariantMenu ? scaledPx(14) : 0;
@@ -4384,6 +4422,7 @@ QWidget#CommandTabWorkbenchViewport {
             if (!quickIcon.isNull()) {
                 button->setIcon(quickIcon);
             }
+            registerCommandToolButton(command.id, button);
             button->setProperty("commandtabRole", QStringLiteral("quick"));
             button->setProperty("commandtabCommandId", command.id);
             button->setProperty("commandtabHasMenuCommands", !command.menuCommands.isEmpty());
@@ -4406,6 +4445,7 @@ QWidget#CommandTabWorkbenchViewport {
         }
 
         auto* button = new CommandTabCommandButton(command, &m_theme, this);
+        registerCommandButton(command.id, button);
         button->setProperty("commandtabCommandId", command.id);
         button->setProperty("commandtabHasMenuCommands", !command.menuCommands.isEmpty());
         button->setProperty("commandtabMenuCommandCount", command.menuCommands.size());
@@ -4699,6 +4739,10 @@ private:
     mutable QSet<QString> m_missingActionCommandIds;
     mutable bool m_actionLookupReady = false;
     mutable bool m_actionLookupRetryInProgress = false;
+    QHash<QString, QVector<QPointer<QWidget>>> m_enabledWidgetsByCommandId;
+    QHash<QString, QVector<QPointer<CommandTabCommandButton>>> m_checkedButtonsByCommandId;
+    QHash<QString, QVector<QPointer<CommandTabCommandButton>>> m_commandButtonsById;
+    QHash<QString, QVector<QPointer<QToolButton>>> m_commandToolButtonsById;
     QHash<QString, QStringList> m_recentPanelCommandHistory;
     QSet<QString> m_pendingPanelPrimaryRefresh;
     bool m_loadingModel = false;
