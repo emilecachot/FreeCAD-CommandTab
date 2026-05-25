@@ -739,7 +739,8 @@ def apply_theme_preferences() -> None:
     with StartupTrace.span("bootstrap.apply_theme_preferences"):
         if Parameters_CommandTab.MODERN_COMMANDTAB_STYLE_ENABLED is not True:
             return
-        _apply_ondsel_defaults_once()
+        if bool(getattr(Parameters_CommandTab, "APPLY_ONDSEL_DEFAULTS", True)) is True:
+            _apply_ondsel_defaults_once()
         _ensure_sketcher_display_defaults()
         if os.path.isdir(THEME_ROOT) is False:
             return

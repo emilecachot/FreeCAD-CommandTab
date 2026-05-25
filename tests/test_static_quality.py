@@ -190,6 +190,7 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "refreshCommandStatesAfterWorkbenchChange()" in shell_text
     assert "scheduleCommandStatesAfterWorkbenchChange" in shell_text
     assert "scheduleWorkbenchActivation(index)" in shell_text
+    assert "ensureWorkbenchPage(index, 2, true)" in shell_text
     assert "scheduleCommandStateRefresh(0, 3)" in shell_text
 
 
@@ -297,6 +298,29 @@ def test_ribbon_surface_settings_contract_present() -> None:
     assert "buttonBordersChanged" in shell_text
     assert "m_surfaceStyle" in widget_text
     assert "m_buttonBordersVisible" in widget_text
+
+
+def test_ondsel_defaults_can_be_disabled() -> None:
+    parameters_text = (ROOT / "Parameters_CommandTab.py").read_text(encoding="utf-8")
+    bootstrap_text = (ROOT / "freecad_commandtab" / "native" / "bootstrap.py").read_text(
+        encoding="utf-8"
+    )
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+    model_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_model.inl").read_text(
+        encoding="utf-8"
+    )
+    dialog_text = (ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_settings_dialog.inl").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ApplyOndselDefaults" in parameters_text
+    assert "APPLY_ONDSEL_DEFAULTS" in bootstrap_text
+    assert "_apply_ondsel_defaults_once()" in bootstrap_text
+    assert "applyOndselDefaults" in bridge_text
+    assert "applyOndselDefaults" in model_text
+    assert "Apply Ondsel defaults at startup" in dialog_text
 
 
 def test_part_design_sketch_compound_label_is_corrected() -> None:

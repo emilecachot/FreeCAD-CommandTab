@@ -44,6 +44,7 @@ struct CommandTabSettingsState
     bool preferNativeCommandTab = true;
     bool nativeCommandTabWarmup = false;
     bool modernCommandTabStyleEnabled = true;
+    bool applyOndselDefaults = true;
     bool hideMenuBarInNativeMode = true;
     QString nativeThemeMode = QStringLiteral("auto");
     QString ribbonSurfaceStyle = QStringLiteral("glass");
@@ -1186,6 +1187,7 @@ QJsonObject settingsToJsonObject(const CommandTabSettingsState& state)
     object.insert(QStringLiteral("preferNativeCommandTab"), state.preferNativeCommandTab);
     object.insert(QStringLiteral("nativeCommandTabWarmup"), state.nativeCommandTabWarmup);
     object.insert(QStringLiteral("modernCommandTabStyleEnabled"), state.modernCommandTabStyleEnabled);
+    object.insert(QStringLiteral("applyOndselDefaults"), state.applyOndselDefaults);
     object.insert(QStringLiteral("hideMenuBarInNativeMode"), state.hideMenuBarInNativeMode);
     object.insert(QStringLiteral("nativeThemeMode"), state.nativeThemeMode);
     object.insert(QStringLiteral("ribbonSurfaceStyle"), state.ribbonSurfaceStyle);
@@ -1564,6 +1566,9 @@ CommandTabSettingsState parseSettingsState(const QJsonObject& object)
     state.preferNativeCommandTab = object.value(QStringLiteral("preferNativeCommandTab")).toBool(state.preferNativeCommandTab);
     state.nativeCommandTabWarmup = object.value(QStringLiteral("nativeCommandTabWarmup")).toBool(state.nativeCommandTabWarmup);
     state.modernCommandTabStyleEnabled = object.value(QStringLiteral("modernCommandTabStyleEnabled")).toBool(state.modernCommandTabStyleEnabled);
+    state.applyOndselDefaults =
+        object.value(QStringLiteral("applyOndselDefaults"))
+            .toBool(state.applyOndselDefaults);
     state.hideMenuBarInNativeMode =
         object.value(QStringLiteral("hideMenuBarInNativeMode"))
             .toBool(state.hideMenuBarInNativeMode);

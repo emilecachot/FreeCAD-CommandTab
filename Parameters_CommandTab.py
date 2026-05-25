@@ -171,6 +171,7 @@ class Settings:
         Settings.SetBoolSetting(
             "ModernCommandTabStyleEnabled", MODERN_COMMANDTAB_STYLE_ENABLED
         )
+        Settings.SetBoolSetting("ApplyOndselDefaults", APPLY_ONDSEL_DEFAULTS)
         Settings.SetBoolSetting(
             "HideMenuBarInNativeMode", HIDE_MENUBAR_IN_NATIVE_MODE
         )
@@ -306,6 +307,7 @@ DefaultSettings = {
     "ModernApplicationMenuEnabled": True,
     "ModernDialogsEnabled": True,
     "ModernCommandTabStyleEnabled": True,
+    "ApplyOndselDefaults": True,
     "HideMenuBarInNativeMode": True,
     "NativeThemeMode": "auto",
     "IconThemeMode": "original",
@@ -689,6 +691,11 @@ MODERN_COMMANDTAB_STYLE_ENABLED = Settings.GetBoolSetting("ModernCommandTabStyle
 if Settings.GetBoolSetting("ModernCommandTabStyleEnabled") is None:
     MODERN_COMMANDTAB_STYLE_ENABLED = bool(DefaultSettings["ModernCommandTabStyleEnabled"])
     Settings.SetBoolSetting("ModernCommandTabStyleEnabled", MODERN_COMMANDTAB_STYLE_ENABLED)
+
+APPLY_ONDSEL_DEFAULTS = Settings.GetBoolSetting("ApplyOndselDefaults")
+if Settings.GetBoolSetting("ApplyOndselDefaults") is None:
+    APPLY_ONDSEL_DEFAULTS = bool(DefaultSettings["ApplyOndselDefaults"])
+    Settings.SetBoolSetting("ApplyOndselDefaults", APPLY_ONDSEL_DEFAULTS)
 
 HIDE_MENUBAR_IN_NATIVE_MODE = Settings.GetBoolSetting("HideMenuBarInNativeMode")
 if Settings.GetBoolSetting("HideMenuBarInNativeMode") is None:

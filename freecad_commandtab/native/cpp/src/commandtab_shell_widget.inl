@@ -626,7 +626,7 @@ public:
         }
         const int index = static_cast<int>(indexValue);
 
-        ensureWorkbenchPage(index);
+        ensureWorkbenchPage(index, 2, true);
         QSignalBlocker tabBlocker(m_tabBar);
         m_tabBar->setCurrentIndex(index);
         m_stack->setCurrentIndex(index);
@@ -638,7 +638,7 @@ public:
         scheduleBackgroundPageWarmup();
         scheduleWorkbenchTabIconRefresh(80);
         scheduleCommandIconRefresh(30, 2);
-        refreshCommandStatesAfterWorkbenchChange();
+        scheduleCommandStatesAfterWorkbenchChange(0);
         return true;
     }
 
@@ -865,7 +865,7 @@ public:
         }
 
         if (activate) {
-            ensureWorkbenchPage(index);
+            ensureWorkbenchPage(index, 2, true);
             QSignalBlocker tabBlocker(m_tabBar);
             m_tabBar->setCurrentIndex(index);
             m_stack->setCurrentIndex(index);
@@ -879,7 +879,7 @@ public:
         scheduleBackgroundPageWarmup();
         scheduleFullPagePreload();
         scheduleCommandIconRefresh(30, 2);
-        refreshCommandStatesAfterWorkbenchChange();
+        scheduleCommandStatesAfterWorkbenchChange(0);
         return true;
     }
 

@@ -39,6 +39,13 @@ public:
             new QCheckBox(trLabel("Enable modern commandtab style"), generalTab);
         generalLayout->addWidget(m_modernCommandTabStyleCheck, generalRow++, 0, 1, 2);
 
+        m_applyOndselDefaultsCheck =
+            new QCheckBox(trLabel("Apply Ondsel defaults at startup"), generalTab);
+        m_applyOndselDefaultsCheck->setToolTip(
+            trLabel("Disable this to stop CommandTab from applying Ondsel-defaults.cfg on startup.")
+        );
+        generalLayout->addWidget(m_applyOndselDefaultsCheck, generalRow++, 0, 1, 2);
+
         m_hideMenuBarInNativeModeCheck =
             new QCheckBox(
                 QCoreApplication::translate(
@@ -893,6 +900,7 @@ QSpinBox::up-button, QSpinBox::down-button {
         m_preferNativeCommandTabCheck->setChecked(state.preferNativeCommandTab);
         m_nativeCommandTabWarmupCheck->setChecked(state.nativeCommandTabWarmup);
         m_modernCommandTabStyleCheck->setChecked(state.modernCommandTabStyleEnabled);
+        m_applyOndselDefaultsCheck->setChecked(state.applyOndselDefaults);
         m_hideMenuBarInNativeModeCheck->setChecked(state.hideMenuBarInNativeMode);
         m_ribbonAutoHideCheck->setChecked(state.ribbonAutoHide);
         m_ribbonAutoHideDelaySpinner->setValue(state.ribbonAutoHideDelayMs);
@@ -1616,6 +1624,7 @@ QPushButton:disabled {
         applyIconToButton(m_preferNativeCommandTabCheck, QStringLiteral("native"));
         applyIconToButton(m_nativeCommandTabWarmupCheck, QStringLiteral("warmup"));
         applyIconToButton(m_modernCommandTabStyleCheck, QStringLiteral("style"));
+        applyIconToButton(m_applyOndselDefaultsCheck, QStringLiteral("theme"));
         applyIconToButton(m_hideMenuBarInNativeModeCheck, QStringLiteral("menu"));
         applyIconToButton(m_ribbonAutoHideCheck, QStringLiteral("autohide"));
         applyIconToButton(m_ribbonHoverTabCheck, QStringLiteral("hover"));
@@ -1965,6 +1974,7 @@ QLabel#CommandTabColorPreviewPanelBody {
         payload.insert(QStringLiteral("preferNativeCommandTab"), m_preferNativeCommandTabCheck->isChecked());
         payload.insert(QStringLiteral("nativeCommandTabWarmup"), m_nativeCommandTabWarmupCheck->isChecked());
         payload.insert(QStringLiteral("modernCommandTabStyleEnabled"), m_modernCommandTabStyleCheck->isChecked());
+        payload.insert(QStringLiteral("applyOndselDefaults"), m_applyOndselDefaultsCheck->isChecked());
         payload.insert(QStringLiteral("hideMenuBarInNativeMode"), m_hideMenuBarInNativeModeCheck->isChecked());
         payload.insert(QStringLiteral("ribbonAutoHide"), m_ribbonAutoHideCheck->isChecked());
         payload.insert(QStringLiteral("ribbonAutoHideDelayMs"), m_ribbonAutoHideDelaySpinner->value());
@@ -2063,6 +2073,7 @@ QLabel#CommandTabColorPreviewPanelBody {
     QCheckBox* m_preferNativeCommandTabCheck = nullptr;
     QCheckBox* m_nativeCommandTabWarmupCheck = nullptr;
     QCheckBox* m_modernCommandTabStyleCheck = nullptr;
+    QCheckBox* m_applyOndselDefaultsCheck = nullptr;
     QCheckBox* m_hideMenuBarInNativeModeCheck = nullptr;
     QCheckBox* m_ribbonAutoHideCheck = nullptr;
     QSpinBox* m_ribbonAutoHideDelaySpinner = nullptr;

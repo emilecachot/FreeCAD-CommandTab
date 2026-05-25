@@ -1117,6 +1117,7 @@ def _native_settings_state_json() -> str:
             "preferNativeCommandTab": bool(getattr(Parameters_CommandTab, "PREFER_NATIVE_COMMANDTAB", True)),
             "nativeCommandTabWarmup": bool(getattr(Parameters_CommandTab, "NATIVE_COMMANDTAB_WARMUP", False)),
             "modernCommandTabStyleEnabled": bool(getattr(Parameters_CommandTab, "MODERN_COMMANDTAB_STYLE_ENABLED", True)),
+            "applyOndselDefaults": bool(getattr(Parameters_CommandTab, "APPLY_ONDSEL_DEFAULTS", True)),
             "hideMenuBarInNativeMode": bool(getattr(Parameters_CommandTab, "HIDE_MENUBAR_IN_NATIVE_MODE", True)),
             "nativeThemeMode": _string_setting("NativeThemeMode", _native_theme_mode_setting()),
             "ribbonSurfaceStyle": _runtime_string_setting("RibbonSurfaceStyle", "glass"),
@@ -1395,6 +1396,7 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     prefer_native_commandtab = bool(payload.get("preferNativeCommandTab", True))
     native_commandtab_warmup = bool(payload.get("nativeCommandTabWarmup", False))
     modern_commandtab_style_enabled = bool(payload.get("modernCommandTabStyleEnabled", True))
+    apply_ondsel_defaults = bool(payload.get("applyOndselDefaults", True))
     hide_menu_bar_in_native_mode = bool(
         payload.get(
             "hideMenuBarInNativeMode",
@@ -1476,6 +1478,9 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
         "ModernCommandTabStyleEnabled", modern_commandtab_style_enabled
     )
     Parameters_CommandTab.Settings.SetBoolSetting(
+        "ApplyOndselDefaults", apply_ondsel_defaults
+    )
+    Parameters_CommandTab.Settings.SetBoolSetting(
         "HideMenuBarInNativeMode", hide_menu_bar_in_native_mode
     )
     Parameters_CommandTab.Settings.SetStringSetting("NativeThemeMode", native_theme_mode)
@@ -1544,6 +1549,7 @@ def _apply_native_preferences_payload(encoded_payload: str) -> None:
     Parameters_CommandTab.PREFER_NATIVE_COMMANDTAB = prefer_native_commandtab
     Parameters_CommandTab.NATIVE_COMMANDTAB_WARMUP = native_commandtab_warmup
     Parameters_CommandTab.MODERN_COMMANDTAB_STYLE_ENABLED = modern_commandtab_style_enabled
+    Parameters_CommandTab.APPLY_ONDSEL_DEFAULTS = apply_ondsel_defaults
     Parameters_CommandTab.HIDE_MENUBAR_IN_NATIVE_MODE = hide_menu_bar_in_native_mode
     Parameters_CommandTab.NATIVE_THEME_MODE = native_theme_mode
     Parameters_CommandTab.NATIVE_COMPACT_PANEL_LAYOUT = compact_panel_layout
