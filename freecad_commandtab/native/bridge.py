@@ -103,7 +103,7 @@ _NATIVE_EAGER_ALL_PANELS_ON_ACTIVATE = str(
     os.environ.get("FREECAD_COMMANDTAB_EAGER_ALL_PANELS", "0") or "0"
 ).strip().lower() not in {"0", "false", "no", "off"}
 _NATIVE_STARTUP_PRELOAD_ALL_PANELS_ENABLED = str(
-    os.environ.get("FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "1") or "1"
+    os.environ.get("FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "0") or "0"
 ).strip().lower() not in {"0", "false", "no", "off"}
 try:
     _PAYLOAD_CACHE_MAX_ENTRIES = max(
@@ -770,21 +770,14 @@ def _build_native_bootstrap_payload_safe(
     if include_all_panels is True:
         return active_workbench, payload, loaded_workbenches, True
 
-    if active_workbench == "" or len(loaded_workbenches) == 0:
-        active_workbench, payload, loaded_workbenches = _build_native_bootstrap_payload(
-            include_all_panels=True
-        )
-        return active_workbench, payload, loaded_workbenches, True
-
     try:
         _structure_key, structure = _load_structure()
     except Exception:
         structure = {}
-    if _has_native_panels(structure, active_workbench) is False:
-        active_workbench, payload, loaded_workbenches = _build_native_bootstrap_payload(
-            include_all_panels=True
-        )
-        return active_workbench, payload, loaded_workbenches, True
+    if active_workbench == "" or _has_native_panels(structure, active_workbench) is False:
+        # Do not load every workbench just because the active one has no
+        # CommandTab panels. That fallback makes startup visibly slower.
+        return active_workbench, payload, set(loaded_workbenches), False
     return active_workbench, payload, loaded_workbenches, False
 
 
@@ -7756,6 +7749,8 @@ class NativeCommandTabController:
                     return
                 workbench_name = _current_workbench_name()
                 if workbench_name == "" or workbench_name == self._last_active_workbench:
+                    return
+                if workbench_name in {"NoneWorkbench"}:
                     return
                 _structure_key, structure = _load_structure()
                 if _is_ignored_workbench(structure, workbench_name):
