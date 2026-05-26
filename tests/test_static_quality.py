@@ -190,7 +190,7 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "refreshCommandStatesAfterWorkbenchChange()" in shell_text
     assert "scheduleCommandStatesAfterWorkbenchChange" in shell_text
     assert "scheduleWorkbenchActivation(index)" in shell_text
-    assert "ensureWorkbenchPage(index, 2, true)" in shell_text
+    assert "ensureWorkbenchPage(index, fullPanelBudgetForIndex(index), false)" in shell_text
     assert "scheduleCommandStateRefresh(0, 3)" in shell_text
     assert "QTimer::singleShot(160, this" in shell_text
     assert "scheduleWorkbenchPageChunk(index)" in shell_text
@@ -214,6 +214,10 @@ def test_native_model_payload_is_persistently_cached() -> None:
     assert "bridge.native_model_payload_cache_hit" in bridge_text
     assert "_load_cached_model_payload(persistent_cache_key)" in bridge_text
     assert "_write_cached_model_payload(persistent_cache_key, payload, loaded_workbenches)" in bridge_text
+    assert "modelHasAllWorkbenchPages()" in shell_text
+    assert "buildAllWorkbenchPagesInMemory(activeIndex)" in shell_text
+    assert "m_bulkBuildingPages" in shell_text
+    assert "fullPanelBudgetForIndex(index)" in shell_text
     assert "ensureWorkbenchPage(index, 4, false)" in shell_text
     assert "scheduleFullPagePreload(35)" in shell_text
 
@@ -452,7 +456,7 @@ def test_native_background_preload_yields_to_ribbon_interaction() -> None:
     assert "isRibbonEventTarget(watched)" in shell_text
     assert "shouldYieldBackgroundRibbonWork" in shell_text
     assert "ensureWorkbenchPage(index, 100000, false)" not in shell_text
-    assert "ensureWorkbenchPage(index, 2, true)" in shell_text
+    assert "ensureWorkbenchPage(index, fullPanelBudgetForIndex(index), false)" in shell_text
     assert "const int budget = 8" in shell_text
     assert "const int budget = currentPage && !shouldYieldBackgroundRibbonWork(80) ? 5 : 2" in shell_text
     assert "QTimer::singleShot(std::clamp(delayMs, 15, 1200)" in shell_text

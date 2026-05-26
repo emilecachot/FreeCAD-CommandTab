@@ -150,7 +150,7 @@ public:
                 !m_workbenchEntries.at(index).panels.isEmpty();
             if (targetHasPanels) {
                 if (!m_settingsState.tabClickPopupMode) {
-                    ensureWorkbenchPage(index, 2, true);
+                    ensureWorkbenchPage(index, fullPanelBudgetForIndex(index), false);
                     m_stack->setCurrentIndex(index);
                 } else if (!m_ribbonCollapsed) {
                     setRibbonCollapsed(true, true);
@@ -597,13 +597,20 @@ public:
         }
 
         if (m_tabBar->count() > 0) {
-            ensureWorkbenchPage(activeIndex, 8, true);
+            const bool allPagesAvailableInModel = modelHasAllWorkbenchPages();
+            if (allPagesAvailableInModel) {
+                buildAllWorkbenchPagesInMemory(activeIndex);
+            } else {
+                ensureWorkbenchPage(activeIndex, fullPanelBudgetForIndex(activeIndex), false);
+            }
             m_tabBar->setCurrentIndex(activeIndex);
             m_stack->setCurrentIndex(activeIndex);
-            scheduleBackgroundPageWarmup();
             rebuildIconPreloadQueue();
             scheduleIconPreload(0);
-            scheduleFullPagePreload();
+            if (!allPagesAvailableInModel) {
+                scheduleBackgroundPageWarmup();
+                scheduleFullPagePreload();
+            }
         }
         startCommandStatePolling();
         applyTabTextColors();
@@ -626,7 +633,7 @@ public:
         }
         const int index = static_cast<int>(indexValue);
 
-        ensureWorkbenchPage(index, 2, true);
+        ensureWorkbenchPage(index, fullPanelBudgetForIndex(index), false);
         QSignalBlocker tabBlocker(m_tabBar);
         m_tabBar->setCurrentIndex(index);
         m_stack->setCurrentIndex(index);
@@ -865,7 +872,7 @@ public:
         }
 
         if (activate) {
-            ensureWorkbenchPage(index, 2, true);
+            ensureWorkbenchPage(index, fullPanelBudgetForIndex(index), false);
             QSignalBlocker tabBlocker(m_tabBar);
             m_tabBar->setCurrentIndex(index);
             m_stack->setCurrentIndex(index);
@@ -2645,6 +2652,53 @@ QWidget#CommandTabWorkbenchViewport {
         return true;
     }
 
+    int fullPanelBudgetForIndex(int index) const
+    {
+        if (index < 0 || index >= m_workbenchEntries.size()) {
+            return 1;
+        }
+        return std::max(1, static_cast<int>(m_workbenchEntries.at(index).panels.size()));
+    }
+
+    bool modelHasAllWorkbenchPages() const
+    {
+        if (m_workbenchEntries.isEmpty()) {
+            return false;
+        }
+        for (const auto& workbench : m_workbenchEntries) {
+            if (workbench.panels.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void buildAllWorkbenchPagesInMemory(int activeIndex)
+    {
+        if (m_workbenchEntries.isEmpty()) {
+            return;
+        }
+
+        m_bulkBuildingPages = true;
+        if (activeIndex >= 0 && activeIndex < m_workbenchEntries.size()) {
+            ensureWorkbenchPage(activeIndex, fullPanelBudgetForIndex(activeIndex), false);
+        }
+        for (int index = 0; index < m_workbenchEntries.size(); ++index) {
+            if (index == activeIndex) {
+                continue;
+            }
+            ensureWorkbenchPage(index, fullPanelBudgetForIndex(index), false);
+        }
+        m_bulkBuildingPages = false;
+        m_fullPagePreloadCompleted = true;
+        m_backgroundPageWarmupScheduled = false;
+        m_fullPagePreloadScheduled = false;
+        updateGeometry();
+        if (m_contentChangedHandler) {
+            m_contentChangedHandler();
+        }
+    }
+
     void refreshWorkbenchPageLayout(int index)
     {
         if (index < 0 || index >= m_pageBuildStates.size()) {
@@ -3027,13 +3081,13 @@ QWidget#CommandTabWorkbenchViewport {
         }
         const bool shouldNotify =
             finished || (m_stack != nullptr && m_stack->currentIndex() == index);
-        if (shouldNotify) {
+        if (shouldNotify && !m_bulkBuildingPages) {
             updateGeometry();
             if (m_contentChangedHandler) {
                 m_contentChangedHandler();
             }
         }
-        if (finished) {
+        if (finished && !m_bulkBuildingPages) {
             if (m_stack != nullptr && m_stack->currentIndex() == index) {
                 scheduleCommandStatesAfterWorkbenchChange(0);
             }
@@ -4839,6 +4893,7 @@ private:
     bool m_fullPagePreloadScheduled = false;
     int m_fullPagePreloadCursor = 0;
     bool m_fullPagePreloadCompleted = false;
+    bool m_bulkBuildingPages = false;
     QVector<CommandTabCommandEntry> m_iconPreloadQueue;
     int m_iconPreloadCursor = 0;
     bool m_iconPreloadScheduled = false;
