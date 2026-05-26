@@ -192,6 +192,21 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "scheduleWorkbenchActivation(index)" in shell_text
     assert "ensureWorkbenchPage(index, 2, true)" in shell_text
     assert "scheduleCommandStateRefresh(0, 3)" in shell_text
+    assert "QTimer::singleShot(160, this" in shell_text
+    assert "scheduleWorkbenchPageChunk(index)" in shell_text
+
+
+def test_native_workbench_activation_is_deferred_from_tab_clicks() -> None:
+    bridge_text = (
+        ROOT / "freecad_commandtab" / "native" / "bridge.py"
+    ).read_text(encoding="utf-8")
+
+    assert "FREECAD_COMMANDTAB_WORKBENCH_ACTIVATION_DELAY_MS" in bridge_text
+    assert "def _schedule_freecad_workbench_activation" in bridge_text
+    assert "freecad_activation_scheduled" in bridge_text
+    assert "QTimer.singleShot(delay_ms, _activate_latest_workbench)" in bridge_text
+    assert "Gui.activateWorkbench(target_workbench)" in bridge_text
+    assert "self._schedule_freecad_workbench_activation(workbench_name)" in bridge_text
 
 
 def test_native_addon_workbenches_are_captured_dynamically() -> None:

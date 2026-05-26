@@ -1330,7 +1330,7 @@ private:
         }
         const int serial = ++m_pendingWorkbenchActivationSerial;
         m_pendingWorkbenchActivationIndex = index;
-        QTimer::singleShot(1, this, [this, index, serial]() {
+        QTimer::singleShot(160, this, [this, index, serial]() {
             if (
                 serial != m_pendingWorkbenchActivationSerial
                 || index != m_pendingWorkbenchActivationIndex
@@ -2637,10 +2637,8 @@ QWidget#CommandTabWorkbenchViewport {
             }
         }
         if (deferInitialChunk) {
-            const int clampedBudget = std::max(1, initialPanelBudget);
-            QTimer::singleShot(1, this, [this, index, clampedBudget]() {
-                buildWorkbenchPageChunk(index, clampedBudget);
-            });
+            (void)initialPanelBudget;
+            scheduleWorkbenchPageChunk(index);
         } else {
             buildWorkbenchPageChunk(index, std::max(1, initialPanelBudget));
         }

@@ -151,6 +151,9 @@ _AVAILABLE_WORKBENCHES_CACHE_TTL_S = 0.45
 _NATIVE_VARIANT_MENU_REPAIR_DELAY_MS = int(
     os.environ.get("FREECAD_COMMANDTAB_VARIANT_MENU_REPAIR_DELAY_MS", "900") or "900"
 )
+_NATIVE_WORKBENCH_ACTIVATION_DELAY_MS = int(
+    os.environ.get("FREECAD_COMMANDTAB_WORKBENCH_ACTIVATION_DELAY_MS", "20") or "20"
+)
 _NATIVE_VARIANT_MENU_REPAIR_MAX_ATTEMPTS = max(
     1,
     int(os.environ.get("FREECAD_COMMANDTAB_VARIANT_MENU_REPAIR_MAX_ATTEMPTS", "4") or "4"),
@@ -7326,6 +7329,8 @@ class NativeCommandTabController:
         self._variant_menu_repair_scheduled = False
         self._variant_menu_repair_attempted = False
         self._variant_menu_repair_attempt_count = 0
+        self._pending_freecad_activation_serial = 0
+        self._pending_freecad_activation_workbench = ""
 
     def close(self) -> None:
         handle = self._handle
@@ -7336,6 +7341,8 @@ class NativeCommandTabController:
         self._variant_menu_repair_scheduled = False
         self._variant_menu_repair_attempted = False
         self._variant_menu_repair_attempt_count = 0
+        self._pending_freecad_activation_serial += 1
+        self._pending_freecad_activation_workbench = ""
 
         try:
             if self._connected_main_window is not None and self._workbench_signal_connected is True:
@@ -7904,6 +7911,38 @@ class NativeCommandTabController:
             return True
         return False
 
+    def _schedule_freecad_workbench_activation(self, workbench_name: str) -> None:
+        workbench_name = str(workbench_name or "").strip()
+        if workbench_name == "" or workbench_name in {"NoneWorkbench"}:
+            return
+        if _is_available_workbench(workbench_name) is False:
+            return
+
+        self._pending_freecad_activation_serial += 1
+        serial = self._pending_freecad_activation_serial
+        self._pending_freecad_activation_workbench = workbench_name
+        delay_ms = max(0, int(_NATIVE_WORKBENCH_ACTIVATION_DELAY_MS))
+        StartupTrace.mark(
+            "bridge.native_controller.freecad_activation_scheduled",
+            workbench=workbench_name,
+            delayMs=delay_ms,
+        )
+
+        def _activate_latest_workbench() -> None:
+            if serial != self._pending_freecad_activation_serial:
+                return
+            target_workbench = self._pending_freecad_activation_workbench
+            if target_workbench == "":
+                return
+            try:
+                if target_workbench == _current_workbench_name():
+                    return
+                Gui.activateWorkbench(target_workbench)
+            except Exception:
+                _logger.exception("deferred FreeCAD workbench activation failed")
+
+        QTimer.singleShot(delay_ms, _activate_latest_workbench)
+
     def _dispatch_native_callback(self, payload, _user_data=None) -> None:
         if payload in [None, b"", ""]:
             return
@@ -7919,7 +7958,7 @@ class NativeCommandTabController:
                 and _is_available_workbench(workbench_name)
                 and workbench_name != _current_workbench_name()
             ):
-                Gui.activateWorkbench(workbench_name)
+                self._schedule_freecad_workbench_activation(workbench_name)
             return
 
         if command_name.startswith("__commandtab_design_apply__:"):
