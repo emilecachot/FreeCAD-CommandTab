@@ -115,7 +115,7 @@ _NATIVE_EAGER_ALL_PANELS_ON_ACTIVATE = str(
     os.environ.get("FREECAD_COMMANDTAB_EAGER_ALL_PANELS", "0") or "0"
 ).strip().lower() not in {"0", "false", "no", "off"}
 _NATIVE_STARTUP_PRELOAD_ALL_PANELS_ENABLED = str(
-    os.environ.get("FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "0") or "0"
+    os.environ.get("FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "1") or "1"
 ).strip().lower() not in {"0", "false", "no", "off"}
 try:
     _PAYLOAD_CACHE_MAX_ENTRIES = max(
@@ -145,6 +145,7 @@ _NATIVE_PERSISTENT_METADATA_BOOTSTRAP_ENABLED = str(
     os.environ.get("FREECAD_COMMANDTAB_PERSISTENT_METADATA_BOOTSTRAP", "0") or "0"
 ).strip().lower() in {"1", "true", "yes", "on"}
 _NATIVE_METADATA_CACHE_VERSION = 36
+_NATIVE_MODEL_PAYLOAD_CACHE_VERSION = 1
 _NATIVE_BOOTSTRAP_PAYLOAD_CACHE_VERSION = 2
 _NATIVE_VARIANT_MENU_CACHE_VERSION = 1
 _AVAILABLE_WORKBENCHES_CACHE_TTL_S = 0.45
@@ -1646,6 +1647,10 @@ def _runtime_model_path() -> Path:
 
 def _runtime_metadata_cache_path() -> Path:
     return _runtime_root() / "metadata-cache.json"
+
+
+def _runtime_model_payload_cache_path() -> Path:
+    return _runtime_root() / "model-payload-cache.json"
 
 
 def _persistent_variant_menu_cache_path() -> Path:
@@ -5919,8 +5924,38 @@ def build_native_model() -> dict:
     return model
 
 
+def _loaded_workbenches_from_model_payload(
+    parsed_payload,
+    active_workbench: str,
+    include_all_panels: bool,
+) -> set[str]:
+    loaded_workbenches: set[str] = set()
+    if isinstance(parsed_payload, dict) is False:
+        if active_workbench != "":
+            return {active_workbench}
+        return loaded_workbenches
+
+    for workbench in _coerce_list(parsed_payload.get("workbenches", [])):
+        workbench_object = _coerce_dict(workbench)
+        workbench_id = str(workbench_object.get("id") or "").strip()
+        if workbench_id == "":
+            continue
+        if include_all_panels is True or workbench_id == active_workbench:
+            if len(_coerce_list(workbench_object.get("panels", []))) > 0:
+                loaded_workbenches.add(workbench_id)
+    return loaded_workbenches
+
+
+def _active_workbench_from_model_payload(parsed_payload, fallback: str = "") -> str:
+    if isinstance(parsed_payload, dict):
+        active_workbench = str(parsed_payload.get("activeWorkbenchId") or "").strip()
+        if active_workbench != "":
+            return active_workbench
+    return str(fallback or "").strip()
+
+
 def _build_native_model_payload(include_all_panels: bool = False) -> tuple[str, str, set[str]]:
-    structure_key, structure, model = _build_base_model()
+    structure_key, structure = _load_structure()
     active_workbench = _current_workbench_name()
     theme_signature = _native_theme_signature()
     settings_signature = _native_settings_state_json()
@@ -5931,15 +5966,33 @@ def _build_native_model_payload(include_all_panels: bool = False) -> tuple[str, 
         include_all_panels,
         settings_signature,
     )
+    persistent_cache_key = _model_payload_cache_key(
+        structure_key,
+        theme_signature,
+        active_workbench,
+        include_all_panels,
+        settings_signature,
+    )
     cached_payload = _MODEL_PAYLOAD_CACHE.get(cache_key)
     if cached_payload is not None:
-        loaded_workbenches = {
-            workbench.get("id", "")
-            for workbench in model.get("workbenches", [])
-            if include_all_panels is True or workbench.get("id") == active_workbench
-        }
-        loaded_workbenches.discard("")
+        try:
+            parsed_payload = json.loads(cached_payload)
+        except Exception:
+            parsed_payload = None
+        active_workbench = _active_workbench_from_model_payload(parsed_payload, active_workbench)
+        loaded_workbenches = _loaded_workbenches_from_model_payload(parsed_payload, active_workbench, include_all_panels)
         return active_workbench, cached_payload, loaded_workbenches
+
+    cached_payload_from_disk = _load_cached_model_payload(persistent_cache_key)
+    if cached_payload_from_disk is not None:
+        disk_payload, disk_loaded_workbenches = cached_payload_from_disk
+        try:
+            parsed_payload = json.loads(disk_payload)
+        except Exception:
+            parsed_payload = None
+        active_workbench = _active_workbench_from_model_payload(parsed_payload, active_workbench)
+        _bounded_cache_set(_MODEL_PAYLOAD_CACHE, cache_key, disk_payload)
+        return active_workbench, disk_payload, disk_loaded_workbenches
 
     loaded_workbenches: set[str] = set()
     metadata_cache_path = _ensure_native_metadata_cache(
@@ -5977,8 +6030,13 @@ def _build_native_model_payload(include_all_panels: bool = False) -> tuple[str, 
                 if workbench_id != "":
                     loaded_workbenches.add(workbench_id)
             _bounded_cache_set(_MODEL_PAYLOAD_CACHE, cache_key, payload)
+            try:
+                _write_cached_model_payload(persistent_cache_key, payload, loaded_workbenches)
+            except Exception:
+                pass
             return active_workbench, payload, loaded_workbenches
 
+    structure_key, structure, model = _build_base_model()
     model["activeWorkbenchId"] = active_workbench
     model["theme"] = CommandTabTheme.current_theme_tokens()
     if include_all_panels is True:
@@ -6002,6 +6060,10 @@ def _build_native_model_payload(include_all_panels: bool = False) -> tuple[str, 
 
     payload = json.dumps(model, ensure_ascii=True, separators=(",", ":"))
     _bounded_cache_set(_MODEL_PAYLOAD_CACHE, cache_key, payload)
+    try:
+        _write_cached_model_payload(persistent_cache_key, payload, loaded_workbenches)
+    except Exception:
+        pass
     return active_workbench, payload, loaded_workbenches
 
 
@@ -7010,6 +7072,85 @@ def _write_cached_bootstrap_payload(
         encoding="utf-8",
     )
     tmp_path.replace(cache_path)
+
+
+def _model_payload_cache_key(
+    structure_key: tuple[str, str, int],
+    theme_signature: tuple[str, str],
+    active_workbench: str,
+    include_all_panels: bool,
+    settings_signature: str,
+) -> dict[str, object]:
+    return {
+        "cacheVersion": _NATIVE_MODEL_PAYLOAD_CACHE_VERSION,
+        "metadataCacheVersion": _NATIVE_METADATA_CACHE_VERSION,
+        "structureKey": [structure_key[0], structure_key[1], structure_key[2]],
+        "themeSignature": [theme_signature[0], theme_signature[1]],
+        "environmentSignature": _native_metadata_environment_signature(),
+        "activeWorkbenchId": str(active_workbench or ""),
+        "includeAllPanels": bool(include_all_panels),
+        "settingsSignature": str(settings_signature or ""),
+    }
+
+
+def _load_cached_model_payload(expected_key: dict[str, object]) -> tuple[str, set[str]] | None:
+    cache_path = _runtime_model_payload_cache_path()
+    if cache_path.exists() is False:
+        return None
+    try:
+        cached_payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if isinstance(cached_payload, dict) is False:
+        return None
+    if _coerce_dict(cached_payload.get("key")) != _coerce_dict(expected_key):
+        return None
+
+    payload = str(cached_payload.get("payload") or "")
+    if payload == "":
+        return None
+    loaded_workbenches = {
+        str(item)
+        for item in _coerce_list(cached_payload.get("loadedWorkbenches", []))
+        if str(item).strip() != ""
+    }
+    StartupTrace.mark(
+        "bridge.native_model_payload_cache_hit",
+        payloadBytes=len(payload.encode("utf-8", errors="ignore")),
+        loadedWorkbenchCount=len(loaded_workbenches),
+    )
+    return payload, loaded_workbenches
+
+
+def _write_cached_model_payload(
+    cache_key: dict[str, object],
+    payload: str,
+    loaded_workbenches: set[str],
+) -> None:
+    if str(payload or "").strip() == "":
+        return
+    cache_path = _runtime_model_payload_cache_path()
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    payload_data = {
+        "key": dict(cache_key),
+        "payload": str(payload),
+        "loadedWorkbenches": sorted(
+            str(item)
+            for item in loaded_workbenches
+            if str(item).strip() != ""
+        ),
+    }
+    tmp_path = cache_path.with_suffix(".tmp")
+    tmp_path.write_text(
+        json.dumps(payload_data, ensure_ascii=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    tmp_path.replace(cache_path)
+    StartupTrace.mark(
+        "bridge.native_model_payload_cache_written",
+        payloadBytes=len(str(payload).encode("utf-8", errors="ignore")),
+        loadedWorkbenchCount=len(loaded_workbenches),
+    )
 
 
 def _build_native_bootstrap_payload(

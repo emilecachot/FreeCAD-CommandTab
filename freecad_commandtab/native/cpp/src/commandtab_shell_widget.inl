@@ -3113,13 +3113,13 @@ QWidget#CommandTabWorkbenchViewport {
             }
 
             m_backgroundWarmupCursor = candidateIndex + 1;
-            ensureWorkbenchPage(candidateIndex, 2, false);
-            scheduleBackgroundPageWarmup(120);
+            ensureWorkbenchPage(candidateIndex, 4, false);
+            scheduleBackgroundPageWarmup(45);
             return;
         }
     }
 
-    void scheduleFullPagePreload(int delayMs = 90)
+    void scheduleFullPagePreload(int delayMs = 35)
     {
         if (m_fullPagePreloadCompleted || m_workbenchEntries.size() <= 1) {
             return;
@@ -3128,7 +3128,7 @@ QWidget#CommandTabWorkbenchViewport {
             return;
         }
         m_fullPagePreloadScheduled = true;
-        QTimer::singleShot(std::clamp(delayMs, 30, 1200), this, [this]() {
+        QTimer::singleShot(std::clamp(delayMs, 15, 1200), this, [this]() {
             m_fullPagePreloadScheduled = false;
             continueFullPagePreload();
         });
@@ -3201,7 +3201,7 @@ QWidget#CommandTabWorkbenchViewport {
             return;
         }
         if (shouldYieldBackgroundRibbonWork(140)) {
-            scheduleFullPagePreload(180);
+            scheduleFullPagePreload(90);
             return;
         }
 
@@ -3217,8 +3217,8 @@ QWidget#CommandTabWorkbenchViewport {
                 continue;
             }
             m_fullPagePreloadCursor = index + 1;
-            ensureWorkbenchPage(index, 2, false);
-            scheduleFullPagePreload(120);
+            ensureWorkbenchPage(index, 4, false);
+            scheduleFullPagePreload(35);
             return;
         }
 

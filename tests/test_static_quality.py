@@ -196,6 +196,28 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "scheduleWorkbenchPageChunk(index)" in shell_text
 
 
+def test_native_model_payload_is_persistently_cached() -> None:
+    bridge_text = (
+        ROOT / "freecad_commandtab" / "native" / "bridge.py"
+    ).read_text(encoding="utf-8")
+    shell_text = (
+        ROOT / "freecad_commandtab" / "native" / "cpp" / "src" / "commandtab_shell_widget.inl"
+    ).read_text(encoding="utf-8")
+
+    assert 'os.environ.get("FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "1")' in bridge_text
+    assert "_NATIVE_MODEL_PAYLOAD_CACHE_VERSION" in bridge_text
+    assert "def _runtime_model_payload_cache_path() -> Path:" in bridge_text
+    assert "def _model_payload_cache_key(" in bridge_text
+    assert "def _load_cached_model_payload(" in bridge_text
+    assert "def _write_cached_model_payload(" in bridge_text
+    assert "def _active_workbench_from_model_payload(" in bridge_text
+    assert "bridge.native_model_payload_cache_hit" in bridge_text
+    assert "_load_cached_model_payload(persistent_cache_key)" in bridge_text
+    assert "_write_cached_model_payload(persistent_cache_key, payload, loaded_workbenches)" in bridge_text
+    assert "ensureWorkbenchPage(index, 4, false)" in shell_text
+    assert "scheduleFullPagePreload(35)" in shell_text
+
+
 def test_native_workbench_activation_is_deferred_from_tab_clicks() -> None:
     bridge_text = (
         ROOT / "freecad_commandtab" / "native" / "bridge.py"
@@ -374,7 +396,7 @@ def test_workspace_tree_overlay_is_explicit_not_tied_to_ribbon_transparency() ->
     assert '_set_bool_if_changed(overlay_left, "Transparent", True)' in bootstrap_text
     assert '_set_bool_if_changed(dock_windows, "Std_ComboView", False)' in bootstrap_text
     assert "workbench_name in {\"NoneWorkbench\"}" in bridge_text
-    assert 'FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "0"' in bridge_text
+    assert 'FREECAD_COMMANDTAB_STARTUP_PRELOAD_ALL_PANELS", "1"' in bridge_text
     assert "fallback makes startup visibly slower" in bridge_text
     assert "OVERLAY_DISABLED" in bootstrap_text
 
@@ -433,7 +455,7 @@ def test_native_background_preload_yields_to_ribbon_interaction() -> None:
     assert "ensureWorkbenchPage(index, 2, true)" in shell_text
     assert "const int budget = 8" in shell_text
     assert "const int budget = currentPage && !shouldYieldBackgroundRibbonWork(80) ? 5 : 2" in shell_text
-    assert "QTimer::singleShot(std::clamp(delayMs, 30, 1200)" in shell_text
+    assert "QTimer::singleShot(std::clamp(delayMs, 15, 1200)" in shell_text
 
 
 def test_command_button_hover_and_labels_are_latency_aware() -> None:
