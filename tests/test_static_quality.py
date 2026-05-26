@@ -194,6 +194,22 @@ def test_native_command_enable_state_refreshes_globally() -> None:
     assert "scheduleCommandStateRefresh(0, 3)" in shell_text
 
 
+def test_native_addon_workbenches_are_captured_dynamically() -> None:
+    bridge_text = (ROOT / "freecad_commandtab" / "native" / "bridge.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def _ensure_dynamic_workbench_structure(workbench_name: str) -> bool:" in bridge_text
+    assert "Gui.Workbench.getToolbarItems" in bridge_text
+    assert "workbench.getToolbarItems()" in bridge_text
+    assert "dynamicWorkbenches" in bridge_text
+    assert "_DYNAMIC_WORKBENCH_COMMON_TOOLBARS" in bridge_text
+    assert "if _is_common_dynamic_workbench_toolbar(toolbar_id):" in bridge_text
+    assert "def _merge_dynamic_workbench_structure" in bridge_text
+    assert "_ensure_dynamic_workbench_structure(_current_workbench_name())" in bridge_text
+    assert "structureCaptured=bool(structure_changed)" in bridge_text
+
+
 def test_build_script_uses_release_config_by_default() -> None:
     build_script_text = (ROOT / "tools" / "build_and_package_local.py").read_text(
         encoding="utf-8"

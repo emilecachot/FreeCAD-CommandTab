@@ -76,6 +76,18 @@ _WORKBENCH_BOOTSTRAP_CACHE: dict[tuple[tuple[str, str, int], tuple[str, str], st
 _WORKBENCH_BOOTSTRAP_STATE_CACHE: dict[str, dict[str, object]] = {}
 _VARIANT_MENU_CACHE_MEMORY: dict[str, object] = {}
 _STATIC_COMMAND_VARIANT_MENU_CACHE: dict[str, list[object]] | None = None
+_DYNAMIC_WORKBENCH_COMMON_TOOLBARS = {
+    "clipboard",
+    "edit",
+    "file",
+    "help",
+    "individual view",
+    "individual views",
+    "macro",
+    "structure",
+    "view",
+    "workbench",
+}
 _COMMAND_DISPLAY_TEXT_OVERRIDES: dict[str, tuple[str, str]] = {
     "PartDesign_CompSketches": ("CmdPartDesignNewSketch", "New Sketch"),
     "PartDesign_NewSketch": ("CmdPartDesignNewSketch", "New Sketch"),
@@ -3774,6 +3786,302 @@ def _editable_structure_path() -> Path:
     raise FileNotFoundError("Editable commandtab structure path not available")
 
 
+def _command_list_from_toolbar_items(items) -> list[str]:
+    commands: list[str] = []
+    separator_index = 0
+    try:
+        iterable = list(items)
+    except Exception:
+        return commands
+
+    for item in iterable:
+        command_name = str(item or "").strip()
+        if command_name == "":
+            continue
+        if _is_separator_command_id(command_name):
+            command_name = f"{separator_index}_separator_dynamic"
+            separator_index += 1
+        commands.append(command_name)
+    return commands
+
+
+def _is_common_dynamic_workbench_toolbar(toolbar_id: str) -> bool:
+    normalized = str(toolbar_id or "").replace("&", "").strip().lower()
+    return normalized in _DYNAMIC_WORKBENCH_COMMON_TOOLBARS
+
+
+def _dynamic_workbench_structure_from_toolbar_items(toolbar_items) -> dict:
+    if not isinstance(toolbar_items, dict):
+        return {}
+
+    toolbars: dict[str, object] = {"order": []}
+    ordered_toolbar_ids: list[str] = []
+    seen_toolbar_ids: set[str] = set()
+
+    for toolbar_title, items in toolbar_items.items():
+        toolbar_id = str(toolbar_title or "").replace("&", "").strip()
+        if toolbar_id == "":
+            continue
+        commands = _command_list_from_toolbar_items(items)
+        if len(commands) == 0:
+            continue
+        if _is_common_dynamic_workbench_toolbar(toolbar_id):
+            continue
+
+        unique_toolbar_id = toolbar_id
+        suffix = 2
+        while unique_toolbar_id in seen_toolbar_ids:
+            unique_toolbar_id = f"{toolbar_id} {suffix}"
+            suffix += 1
+        seen_toolbar_ids.add(unique_toolbar_id)
+        ordered_toolbar_ids.append(unique_toolbar_id)
+        toolbars[unique_toolbar_id] = {
+            "title": toolbar_id,
+            "order": commands,
+            "commands": {
+                command_name: {"size": "small"}
+                for command_name in commands
+                if _is_separator_command_id(command_name) is False
+            },
+            "Enabled": True,
+        }
+
+    if len(ordered_toolbar_ids) == 0:
+        return {}
+
+    toolbars["order"] = ordered_toolbar_ids
+    return {"toolbars": toolbars}
+
+
+def _workbench_toolbar_items(workbench_name: str) -> dict:
+    try:
+        workbench = Gui.getWorkbench(workbench_name)
+    except Exception:
+        workbench = None
+    if workbench is None:
+        workbench = _available_workbenches().get(workbench_name)
+    if workbench is None:
+        return {}
+
+    try:
+        toolbar_items = workbench.getToolbarItems()
+    except Exception:
+        return {}
+    if not isinstance(toolbar_items, dict):
+        return {}
+    return toolbar_items
+
+
+def _structure_workbench_has_panels(structure: dict, workbench_name: str) -> bool:
+    workbench_data = _coerce_dict(
+        _coerce_dict(structure.get("workbenches", {})).get(workbench_name, {})
+    )
+    toolbars = _coerce_dict(workbench_data.get("toolbars", {}))
+    for panel_id, panel_data in toolbars.items():
+        if str(panel_id) == "order":
+            continue
+        if not isinstance(panel_data, dict):
+            continue
+        if bool(panel_data.get("Enabled", True)) is False:
+            continue
+        if len(_coerce_list(panel_data.get("order", []))) > 0:
+            return True
+    return False
+
+
+def _dynamic_workbench_signature(workbench_data: dict) -> str:
+    toolbars = _coerce_dict(workbench_data.get("toolbars", {}))
+    signature_payload: list[object] = []
+    for toolbar_id in _coerce_list(toolbars.get("order", [])):
+        toolbar_key = str(toolbar_id or "").strip()
+        if toolbar_key == "":
+            continue
+        toolbar_data = _coerce_dict(toolbars.get(toolbar_key, {}))
+        signature_payload.append(
+            [
+                toolbar_key,
+                [
+                    str(command_name or "").strip()
+                    for command_name in _coerce_list(toolbar_data.get("order", []))
+                    if str(command_name or "").strip() != ""
+                ],
+            ]
+        )
+    return hashlib.sha1(
+        json.dumps(signature_payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _merge_dynamic_workbench_structure(existing_workbench: dict, captured_workbench: dict) -> bool:
+    existing_toolbars = _coerce_dict(existing_workbench.get("toolbars", {}))
+    captured_toolbars = _coerce_dict(captured_workbench.get("toolbars", {}))
+    existing_order = [
+        str(toolbar_id or "").strip()
+        for toolbar_id in _coerce_list(existing_toolbars.get("order", []))
+        if str(toolbar_id or "").strip() != ""
+    ]
+    dirty = False
+
+    for toolbar_id in list(existing_order):
+        if toolbar_id in captured_toolbars:
+            continue
+        if _is_common_dynamic_workbench_toolbar(toolbar_id) is False:
+            continue
+        existing_order.remove(toolbar_id)
+        existing_toolbars.pop(toolbar_id, None)
+        dirty = True
+
+    for captured_toolbar_id in _coerce_list(captured_toolbars.get("order", [])):
+        toolbar_id = str(captured_toolbar_id or "").strip()
+        if toolbar_id == "":
+            continue
+        captured_toolbar = _coerce_dict(captured_toolbars.get(toolbar_id, {}))
+        if toolbar_id not in existing_toolbars:
+            existing_toolbars[toolbar_id] = copy.deepcopy(captured_toolbar)
+            if toolbar_id not in existing_order:
+                existing_order.append(toolbar_id)
+            dirty = True
+            continue
+
+        existing_toolbar = _coerce_dict(existing_toolbars.get(toolbar_id, {}))
+        existing_commands = _coerce_dict(existing_toolbar.get("commands", {}))
+        existing_command_order = [
+            str(command_name or "").strip()
+            for command_name in _coerce_list(existing_toolbar.get("order", []))
+            if str(command_name or "").strip() != ""
+        ]
+        for command_name in _coerce_list(captured_toolbar.get("order", [])):
+            command_id = str(command_name or "").strip()
+            if command_id == "" or command_id in existing_command_order:
+                continue
+            existing_command_order.append(command_id)
+            if _is_separator_command_id(command_id) is False:
+                captured_commands = _coerce_dict(captured_toolbar.get("commands", {}))
+                existing_commands[command_id] = copy.deepcopy(
+                    _coerce_dict(captured_commands.get(command_id, {"size": "small"}))
+                )
+            dirty = True
+
+        if existing_command_order != _coerce_list(existing_toolbar.get("order", [])):
+            existing_toolbar["order"] = existing_command_order
+        if existing_commands:
+            existing_toolbar["commands"] = existing_commands
+        if str(existing_toolbar.get("title") or "").strip() == "":
+            existing_toolbar["title"] = str(captured_toolbar.get("title") or toolbar_id)
+        if "Enabled" not in existing_toolbar:
+            existing_toolbar["Enabled"] = True
+        existing_toolbars[toolbar_id] = existing_toolbar
+
+    if existing_order != _coerce_list(existing_toolbars.get("order", [])):
+        existing_toolbars["order"] = existing_order
+        dirty = True
+    existing_workbench["toolbars"] = existing_toolbars
+    return dirty
+
+
+def _clear_structure_and_model_caches() -> None:
+    _STRUCTURE_CACHE.clear()
+    _BASE_MODEL_CACHE.clear()
+    _WORKBENCH_PANEL_CACHE.clear()
+    _WORKBENCH_PAYLOAD_CACHE.clear()
+    _BOOTSTRAP_PAYLOAD_CACHE.clear()
+    _WORKBENCH_BOOTSTRAP_CACHE.clear()
+    _WORKBENCH_BOOTSTRAP_STATE_CACHE.clear()
+    _MODEL_PAYLOAD_CACHE.clear()
+
+
+def _ensure_dynamic_workbench_structure(workbench_name: str) -> bool:
+    workbench_name = str(workbench_name or "").strip()
+    if workbench_name == "" or workbench_name in {"NoneWorkbench"}:
+        return False
+    if _is_available_workbench(workbench_name) is False:
+        return False
+
+    with StartupTrace.span(
+        "bridge.ensure_dynamic_workbench_structure",
+        workbench=workbench_name,
+    ):
+        try:
+            structure_path = _editable_structure_path()
+            structure = json.loads(structure_path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        if not isinstance(structure, dict):
+            return False
+        if _is_ignored_workbench(structure, workbench_name):
+            return False
+
+        workbenches = _coerce_dict(structure.get("workbenches", {}))
+        existing_workbench = _coerce_dict(workbenches.get(workbench_name, {}))
+        dynamic_workbenches = _coerce_dict(structure.get("dynamicWorkbenches", {}))
+        dynamic_metadata = _coerce_dict(dynamic_workbenches.get(workbench_name, {}))
+        is_dynamic_workbench = (
+            str(dynamic_metadata.get("source") or "").strip()
+            == "Gui.Workbench.getToolbarItems"
+        )
+        existing_has_panels = _structure_workbench_has_panels(structure, workbench_name)
+        if existing_has_panels and is_dynamic_workbench is False:
+            return False
+
+        captured_workbench = _dynamic_workbench_structure_from_toolbar_items(
+            _workbench_toolbar_items(workbench_name)
+        )
+        if not captured_workbench:
+            return False
+
+        captured_signature = _dynamic_workbench_signature(captured_workbench)
+        if existing_has_panels:
+            dirty = _merge_dynamic_workbench_structure(existing_workbench, captured_workbench)
+            if (
+                dirty is False
+                and str(dynamic_metadata.get("signature") or "") == captured_signature
+            ):
+                return False
+            workbenches[workbench_name] = existing_workbench
+        else:
+            workbenches[workbench_name] = captured_workbench
+            dirty = True
+        structure["workbenches"] = workbenches
+        dynamic_workbenches = _coerce_dict(structure.get("dynamicWorkbenches", {}))
+        dynamic_workbenches[workbench_name] = {
+            "source": "Gui.Workbench.getToolbarItems",
+            "toolbarCount": len(_coerce_dict(captured_workbench.get("toolbars", {})).get("order", [])),
+            "signature": captured_signature,
+        }
+        structure["dynamicWorkbenches"] = dynamic_workbenches
+
+        try:
+            structure_path.write_text(
+                json.dumps(structure, indent=4, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception:
+            return False
+
+        _clear_structure_and_model_caches()
+        StartupTrace.mark(
+            "bridge.dynamic_workbench_structure_saved",
+            workbench=workbench_name,
+            toolbarCount=int(dynamic_workbenches[workbench_name].get("toolbarCount", 0)),
+        )
+        return True
+
+
+def _ensure_initialized_available_workbench_structures() -> int:
+    saved_count = 0
+    try:
+        available_names = list(_available_workbenches().keys())
+    except Exception:
+        return saved_count
+    for workbench_name in available_names:
+        try:
+            if _ensure_dynamic_workbench_structure(str(workbench_name)):
+                saved_count += 1
+        except Exception:
+            continue
+    return saved_count
+
+
 def _decode_native_design_payload(encoded_payload: str) -> dict:
     payload = str(encoded_payload or "").strip()
     if payload == "":
@@ -7069,6 +7377,11 @@ class NativeCommandTabController:
             if self._handle:
                 return True
 
+            try:
+                _ensure_dynamic_workbench_structure(_current_workbench_name())
+            except Exception:
+                pass
+
             if _is_cpp_bootstrap_pipeline_enabled() is True:
                 eager_startup_panels = (
                     _is_native_eager_all_panels_on_activate()
@@ -7232,13 +7545,14 @@ class NativeCommandTabController:
             if self._handle in [None, 0]:
                 return
             try:
+                captured_count = _ensure_initialized_available_workbench_structures()
                 structure_key, structure = _load_structure()
                 _ensure_native_metadata_cache(
                     structure_key,
                     structure,
                     required_workbenches=None,
                     include_quick_access=True,
-                    force=False,
+                    force=bool(captured_count > 0),
                 )
                 self.refresh(
                     force=True,
@@ -7755,10 +8069,12 @@ class NativeCommandTabController:
                 _structure_key, structure = _load_structure()
                 if _is_ignored_workbench(structure, workbench_name):
                     return
+                structure_changed = _ensure_dynamic_workbench_structure(workbench_name)
                 StartupTrace.mark(
                     "bridge.native_controller.workbench_activated",
                     workbench=workbench_name,
                     alreadyLoaded=workbench_name in self._loaded_workbenches,
+                    structureCaptured=bool(structure_changed),
                 )
                 if workbench_name in self._loaded_workbenches:
                     # Workbench already loaded in native shell: switch active tab
