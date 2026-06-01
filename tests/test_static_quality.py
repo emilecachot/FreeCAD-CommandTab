@@ -155,7 +155,9 @@ def test_native_dropdown_commands_use_split_button_behavior() -> None:
     assert "_COMMAND_SUBACTION_ENTRY_CACHE" in bridge_text
     assert "cached_or_static_entries = _cached_or_static_variant_menu_entries" in bridge_text
     assert "max_entries=512" in bridge_text
-    assert "def _fallback_icon_path(command_name: str, persistent: bool = False) -> str:" in bridge_text
+    assert 'paths.addon_path("Resources", "freecad-icons")' in bridge_text
+    assert "def _freecad_icon_base_signature() -> str:" in bridge_text
+    assert "commandtab-fallback" not in bridge_text
     assert 'menu_command["iconPath"] = parent_icon_path' in bridge_text
     assert "def _enrich_native_payload_menu_commands" in bridge_text
     assert "_enrich_native_payload_menu_commands(parsed_payload)" in bridge_text

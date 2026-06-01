@@ -1677,8 +1677,8 @@ def _qt_action_icons_dir() -> Path:
 
 
 def _persistent_icon_export_dir() -> Path:
-    """Persistent icon export directory that survives FreeCAD restarts."""
-    icon_dir = Path(paths.user_cache_path("icons"))
+    """Addon-local FreeCAD icon export directory bundled by the packager."""
+    icon_dir = Path(paths.addon_path("Resources", "freecad-icons"))
     icon_dir.mkdir(parents=True, exist_ok=True)
     return icon_dir
 
@@ -2913,12 +2913,34 @@ def _runtime_action_icon_path(action_ref: str, icon_cache_key: str = "") -> Path
     return _runtime_icons_dir() / f"{safe_name[:96]}_{digest[:12]}.png"
 
 
+def _freecad_icon_base_signature() -> str:
+    # Fast comparison key for the addon-local icon base: a FreeCAD build,
+    # Qt, metadata, or theme change produces different persistent filenames.
+    payload = {
+        "freecad": _freecad_version_signature(),
+        "build": _freecad_build_signature(),
+        "theme": list(_native_theme_signature()),
+        "qt": qVersion(),
+        "metadata": _NATIVE_METADATA_CACHE_VERSION,
+    }
+    digest = hashlib.sha1(
+        json.dumps(
+            payload,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    return digest[:12]
+
+
 def _persistent_action_icon_path(action_ref: str, icon_cache_key: str = "") -> Path:
     theme_signature = "|".join(_native_theme_signature())
+    icon_base_signature = _freecad_icon_base_signature()
     digest = hashlib.sha1(
         (
-            f"{action_ref}|{icon_cache_key}|{theme_signature}"
-            f"|metadata-v{_NATIVE_METADATA_CACHE_VERSION}|native-action-icon-export-persistent-v1"
+            f"{action_ref}|{icon_cache_key}|{theme_signature}|icon-base:{icon_base_signature}"
+            f"|metadata-v{_NATIVE_METADATA_CACHE_VERSION}|native-action-icon-export-persistent-v2"
         ).encode()
     ).hexdigest()
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(action_ref or "action")).strip("_")
@@ -2930,10 +2952,11 @@ def _persistent_action_icon_path(action_ref: str, icon_cache_key: str = "") -> P
 def _persistent_icon_path(
     command_name: str, icon_hint: str = "", theme_signature: str = ""
 ) -> Path:
+    icon_base_signature = _freecad_icon_base_signature()
     digest = hashlib.sha1(
         (
-            f"{command_name}|{icon_hint}|{theme_signature}"
-            f"|metadata-v{_NATIVE_METADATA_CACHE_VERSION}|native-icon-export-persistent-v1"
+            f"{command_name}|{icon_hint}|{theme_signature}|icon-base:{icon_base_signature}"
+            f"|metadata-v{_NATIVE_METADATA_CACHE_VERSION}|native-icon-export-persistent-v2"
         ).encode()
     ).hexdigest()
     safe_name = command_name.replace("/", "_").replace("\\", "_").replace(" ", "_")
@@ -2979,37 +3002,6 @@ def _cached_command_metadata_is_complete(command_payload: dict) -> bool:
     return icon_path == "" or _is_stable_icon_reference(icon_path)
 
 
-def _fallback_icon_path(command_name: str, persistent: bool = False) -> str:
-    theme_signature = "|".join(_native_theme_signature())
-    output_path = (
-        _persistent_icon_path(command_name, "commandtab-fallback", theme_signature)
-        if persistent
-        else _runtime_icon_path(command_name, "commandtab-fallback", theme_signature)
-    )
-    if output_path.exists():
-        return str(output_path)
-
-    pixmap = QPixmap(QSize(64, 64))
-    pixmap.fill(Qt.transparent)
-    painter = QPainter(pixmap)
-    try:
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setBrush(QColor("#4f8cff"))
-        painter.setPen(QColor("#1d4ed8"))
-        painter.drawRoundedRect(10, 10, 44, 44, 10, 10)
-        painter.setPen(QColor("#ffffff"))
-        painter.drawLine(24, 22, 40, 32)
-        painter.drawLine(24, 42, 40, 32)
-    finally:
-        painter.end()
-
-    try:
-        pixmap.save(str(output_path), "PNG")
-    except Exception:
-        return ""
-    return str(output_path)
-
-
 def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = False) -> str:
     theme_signature = "|".join(_native_theme_signature())
     output_path = (
@@ -3027,11 +3019,15 @@ def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = Fals
         )
         if direct_icon_path not in ["", None] and Path(direct_icon_path).exists():
             return str(Path(direct_icon_path))
-        return _fallback_icon_path(command_name, persistent)
+        qt_action_metadata = _qt_action_command_metadata(command_name)
+        qt_icon_path = str(qt_action_metadata.get("iconPath") or "").strip()
+        return qt_icon_path
 
     pixmap = icon.pixmap(QSize(64, 64))
     if pixmap is None or pixmap.isNull():
-        return _fallback_icon_path(command_name, persistent)
+        qt_action_metadata = _qt_action_command_metadata(command_name)
+        qt_icon_path = str(qt_action_metadata.get("iconPath") or "").strip()
+        return qt_icon_path
 
     try:
         pixmap.save(str(output_path), "PNG")
@@ -3046,7 +3042,7 @@ def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = Fals
     if qt_icon_path != "":
         return qt_icon_path
 
-    return _fallback_icon_path(command_name, persistent)
+    return ""
 
 
 def _normalize_action_candidate(value) -> str:
