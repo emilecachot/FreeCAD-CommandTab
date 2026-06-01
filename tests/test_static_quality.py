@@ -152,6 +152,11 @@ def test_native_dropdown_commands_use_split_button_behavior() -> None:
     assert "from PySide.QtWidgets import QToolBar, QToolButton, QWidget" in bridge_text
     assert "toolbar.findChildren(QToolButton)" in bridge_text
     assert 'os.environ.get("FREECAD_COMMANDTAB_CPP_BOOTSTRAP_PIPELINE", "0")' in bridge_text
+    assert "_COMMAND_SUBACTION_ENTRY_CACHE" in bridge_text
+    assert "cached_or_static_entries = _cached_or_static_variant_menu_entries" in bridge_text
+    assert "max_entries=512" in bridge_text
+    assert "def _fallback_icon_path(command_name: str, persistent: bool = False) -> str:" in bridge_text
+    assert 'menu_command["iconPath"] = parent_icon_path' in bridge_text
     assert "def _enrich_native_payload_menu_commands" in bridge_text
     assert "_enrich_native_payload_menu_commands(parsed_payload)" in bridge_text
     assert "def _persistent_variant_menu_cache_path() -> Path:" in bridge_text
@@ -576,7 +581,7 @@ def test_startup_variant_menu_repair_is_enabled() -> None:
     assert "def _payload_has_command_variant_menus(payload: str) -> bool:" in bridge_text
     assert 'command_type == "command"' in bridge_text
     assert "CommandTabVariantMenus.json" in bridge_text
-    assert "return _cached_or_static_variant_menu_entries(command_name, command_data)" in bridge_text
+    assert "_cached_or_static_variant_menu_entries(command_name, command_data)" in bridge_text
     assert "def _static_variant_menu_entries(command_name: str, command_data: dict) -> list[dict]:" in bridge_text
     assert "def _schedule_variant_menu_repair_if_needed(self, payload: str) -> None:" in bridge_text
     assert "def _run_variant_menu_repair(self) -> None:" in bridge_text

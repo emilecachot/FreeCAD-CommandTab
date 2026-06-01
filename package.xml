@@ -5,9 +5,9 @@
 
   <description>A native ribbon-style CommandTab interface for FreeCAD.</description>
 
-  <version>0.1.8</version>
+  <version>0.1.9</version>
 
-  <date>2026-05-23</date>
+  <date>2026-06-01</date>
 
   <freecadmin>0.21.0</freecadmin>
   <pythonmin>3.8.0</pythonmin>

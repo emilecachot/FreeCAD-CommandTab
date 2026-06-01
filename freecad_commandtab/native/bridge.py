@@ -60,6 +60,7 @@ _WINDOWS_DLL_SEARCH_PATH_HANDLES: list[object] = []
 _STRUCTURE_CACHE: dict[str, object] = {}
 _COMMAND_INFO_CACHE: dict[str, dict] = {}
 _COMMAND_ENTRY_CACHE: dict[tuple[object, ...], dict] = {}
+_COMMAND_SUBACTION_ENTRY_CACHE: dict[tuple[object, ...], list[dict]] = {}
 _QT_ACTION_CACHE: dict[tuple[str, str], dict[str, dict]] = {}
 _QT_ACTION_CACHE_FAILURES: dict[tuple[str, str], int] = {}
 _WORKBENCH_TITLE_CACHE: dict[str, str] = {}
@@ -292,6 +293,7 @@ def _clear_runtime_payload_caches() -> None:
     _WORKBENCH_PAYLOAD_CACHE.clear()
     _WORKBENCH_BOOTSTRAP_CACHE.clear()
     _WORKBENCH_BOOTSTRAP_STATE_CACHE.clear()
+    _COMMAND_SUBACTION_ENTRY_CACHE.clear()
 
 
 def _is_separator_command_id(command_name: str) -> bool:
@@ -356,6 +358,7 @@ def _invalidate_native_model_caches() -> None:
 
     _COMMAND_INFO_CACHE.clear()
     _COMMAND_ENTRY_CACHE.clear()
+    _COMMAND_SUBACTION_ENTRY_CACHE.clear()
     _QT_ACTION_CACHE.clear()
     _QT_ACTION_CACHE_FAILURES.clear()
     _WORKBENCH_TITLE_CACHE.clear()
@@ -2976,6 +2979,37 @@ def _cached_command_metadata_is_complete(command_payload: dict) -> bool:
     return icon_path == "" or _is_stable_icon_reference(icon_path)
 
 
+def _fallback_icon_path(command_name: str, persistent: bool = False) -> str:
+    theme_signature = "|".join(_native_theme_signature())
+    output_path = (
+        _persistent_icon_path(command_name, "commandtab-fallback", theme_signature)
+        if persistent
+        else _runtime_icon_path(command_name, "commandtab-fallback", theme_signature)
+    )
+    if output_path.exists():
+        return str(output_path)
+
+    pixmap = QPixmap(QSize(64, 64))
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    try:
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setBrush(QColor("#4f8cff"))
+        painter.setPen(QColor("#1d4ed8"))
+        painter.drawRoundedRect(10, 10, 44, 44, 10, 10)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawLine(24, 22, 40, 32)
+        painter.drawLine(24, 42, 40, 32)
+    finally:
+        painter.end()
+
+    try:
+        pixmap.save(str(output_path), "PNG")
+    except Exception:
+        return ""
+    return str(output_path)
+
+
 def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = False) -> str:
     theme_signature = "|".join(_native_theme_signature())
     output_path = (
@@ -2993,11 +3027,11 @@ def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = Fals
         )
         if direct_icon_path not in ["", None] and Path(direct_icon_path).exists():
             return str(Path(direct_icon_path))
-        return ""
+        return _fallback_icon_path(command_name, persistent)
 
     pixmap = icon.pixmap(QSize(64, 64))
     if pixmap is None or pixmap.isNull():
-        return ""
+        return _fallback_icon_path(command_name, persistent)
 
     try:
         pixmap.save(str(output_path), "PNG")
@@ -3012,7 +3046,7 @@ def _export_icon(command_name: str, icon_hint: str = "", persistent: bool = Fals
     if qt_icon_path != "":
         return qt_icon_path
 
-    return ""
+    return _fallback_icon_path(command_name, persistent)
 
 
 def _normalize_action_candidate(value) -> str:
@@ -3603,13 +3637,39 @@ def _append_command_subaction_entries(
 def _command_subaction_entries(command_name: str, command_data: dict) -> list[dict]:
     if command_name.startswith("__commandtab_action__:"):
         return []
+    command_data = _coerce_dict(command_data or {})
+    cache_key = (
+        str(command_name or "").strip(),
+        str(command_data.get("sourceWorkbenchId") or ""),
+        str(command_data.get("sourceToolbarTitle") or ""),
+        tuple(_native_theme_signature()),
+        str(_CACHE_LOCALE_SIGNATURE),
+    )
+    cached_entries = _COMMAND_SUBACTION_ENTRY_CACHE.get(cache_key)
+    if cached_entries is not None:
+        return copy.deepcopy(cached_entries)
+
+    def _remember(entries: list[dict]) -> list[dict]:
+        if entries:
+            _bounded_cache_set(
+                _COMMAND_SUBACTION_ENTRY_CACHE,
+                cache_key,
+                copy.deepcopy(entries),
+                max_entries=512,
+            )
+        return entries
+
+    cached_or_static_entries = _cached_or_static_variant_menu_entries(command_name, command_data)
+    if cached_or_static_entries:
+        return _remember(cached_or_static_entries)
+
     try:
         command = Gui.Command.get(command_name)
         actions = list(command.getAction()) if command is not None else []
     except Exception:
-        return _cached_or_static_variant_menu_entries(command_name, command_data)
+        return _remember(_cached_or_static_variant_menu_entries(command_name, command_data))
     if len(actions) == 0:
-        return _cached_or_static_variant_menu_entries(command_name, command_data)
+        return _remember(_cached_or_static_variant_menu_entries(command_name, command_data))
 
     entries: list[dict] = []
     seen_ids: set[str] = {command_name}
@@ -3639,8 +3699,8 @@ def _command_subaction_entries(command_name: str, command_data: dict) -> list[di
         )
     if entries:
         _write_variant_menu_cache_entry(command_name, entries)
-        return entries
-    return _cached_or_static_variant_menu_entries(command_name, command_data)
+        return _remember(entries)
+    return _remember(_cached_or_static_variant_menu_entries(command_name, command_data))
 
 
 def _command_subaction_signature(menu_commands: list[dict]) -> tuple[tuple[str, str], ...]:
@@ -5288,6 +5348,18 @@ def _enrich_native_payload_menu_commands(payload: dict) -> dict:
                 existing_menu_commands = menu_commands
         elif str(command.get("type") or "").strip().lower() == "command":
             _write_variant_menu_cache_entry(command_id, existing_menu_commands)
+        parent_icon_path = str(command.get("iconPath") or "")
+        if existing_menu_commands and not _is_stable_icon_reference(parent_icon_path):
+            parent_icon_path = _export_icon(command_id, "")
+            if parent_icon_path:
+                command["iconPath"] = parent_icon_path
+        if existing_menu_commands and _is_stable_icon_reference(parent_icon_path):
+            for menu_command in existing_menu_commands:
+                if not isinstance(menu_command, dict):
+                    continue
+                menu_icon_path = str(menu_command.get("iconPath") or "")
+                if not _is_stable_icon_reference(menu_icon_path):
+                    menu_command["iconPath"] = parent_icon_path
         for menu_command in existing_menu_commands:
             if isinstance(menu_command, dict):
                 _enrich_command(menu_command)
